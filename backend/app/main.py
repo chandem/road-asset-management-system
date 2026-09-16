@@ -5,6 +5,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.chainage_points import router as chainage_points_router
 from app.api.routes.gps_tracks import router as gps_tracks_router
 from app.api.routes.images import router as images_router
+from app.api.routes.inspection_workflow import router as inspection_workflow_router
 from app.api.routes.inspections import router as inspections_router
 from app.api.routes.maintenance import router as maintenance_router
 from app.api.routes.road_assets import router as road_assets_router
@@ -25,6 +26,7 @@ app.include_router(road_sections_router, prefix="/api/v1")
 app.include_router(chainage_points_router, prefix="/api/v1")
 app.include_router(road_assets_router, prefix="/api/v1")
 app.include_router(inspections_router, prefix="/api/v1")
+app.include_router(inspection_workflow_router, prefix="/api/v1")
 app.include_router(road_defects_router, prefix="/api/v1")
 app.include_router(maintenance_router, prefix="/api/v1")
 app.include_router(gps_tracks_router, prefix="/api/v1")
