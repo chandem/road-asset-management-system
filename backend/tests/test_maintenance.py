@@ -96,6 +96,21 @@ def test_validate_links_rejects_defect_from_another_section():
     assert exc_info.value.detail == "Source defect does not belong to the selected section"
 
 
+def test_validate_links_rejects_defect_from_another_road():
+    defect_section = make_section(11, 2)
+    defect = make_defect(11)
+    db = FakeDB({
+        (RoadSection, 11): defect_section,
+        (RoadDefect, 20): defect,
+    })
+
+    with pytest.raises(HTTPException) as exc_info:
+        _validate_links(db, 1, None, 20)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Source defect does not belong to this road"
+
+
 def test_validate_links_rejects_missing_source_defect():
     db = FakeDB({})
 
