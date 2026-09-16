@@ -72,6 +72,11 @@ def _validate_links(
         defect = db.get(RoadDefect, source_defect_id)
         if defect is None:
             raise HTTPException(status_code=404, detail="Source defect not found")
+
+        defect_section = db.get(RoadSection, defect.section_id)
+        if defect_section is None or defect_section.road_id != road_id:
+            raise HTTPException(status_code=400, detail="Source defect does not belong to this road")
+
         if section is not None and defect.section_id != section.section_id:
             raise HTTPException(status_code=400, detail="Source defect does not belong to the selected section")
 
