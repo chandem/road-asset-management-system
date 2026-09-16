@@ -11,7 +11,13 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.user import User
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-this-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET_KEY must be set before starting RAMS")
+
+if len(SECRET_KEY) < 32:
+    raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters long")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
@@ -48,11 +54,19 @@ def get_current_user(
         payload = decode_access_token(token)
         user_id = int(payload["sub"])
     except (ValueError, KeyError, TypeError):
-        raise HTTPException(status_code=401, detail="Invalid or expired token", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     user = db.get(User, user_id)
     if user is None or not user.is_active:
-        raise HTTPException(status_code=401, detail="User is not active", headers={"WWW-Authenticate": "Bearer"})
+        raise HTTPException(
+            status_code=401,
+            detail="User is not active",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 
@@ -61,7 +75,10 @@ def require_roles(*roles: str) -> Callable:
 
     def dependency(current_user: Annotated[User, Depends(get_current_user)]) -> User:
         if current_user.role not in allowed_roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to perform this action")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action",
+            )
         return current_user
 
     return dependency
@@ -70,5 +87,8 @@ def require_roles(*roles: str) -> Callable:
 AdminUser = Annotated[User, Depends(require_roles("admin"))]
 EngineerUser = Annotated[User, Depends(require_roles("admin", "engineer"))]
 InspectorUser = Annotated[User, Depends(require_roles("admin", "engineer", "inspector"))]
-FieldStaffUser = Annotated[User, Depends(require_roles("admin", "engineer", "inspector", "field_staff"))]
+FieldStaffUser = Annotated[
+    User,
+    Depends(require_roles("admin", "engineer", "inspector", "field_staff")),
+]
 AuthenticatedUser = Annotated[User, Depends(get_current_user)]
