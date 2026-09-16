@@ -11,6 +11,7 @@ from app.schemas.ai_detection_result import (
     AIDetectionResultCreate,
     AIDetectionResultResponse,
 )
+from app.services.defect_detector import get_detector
 
 router = APIRouter(tags=["AI Detection"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -70,3 +71,37 @@ def create_ai_detection(
 
     db.refresh(detection)
     return detection
+
+
+@router.post(
+    "/images/{image_id}/ai-detect",
+    response_model=list[AIDetectionResultResponse],
+)
+def run_ai_detection(image_id: int, db: DbSession):
+    image = db.get(Image, image_id)
+    if image is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    detector = get_detector()
+    try:
+        predictions = detector.predict(image.file_path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    results = []
+    for prediction in predictions:
+        result = AIDetectionResult(
+            image_id=image_id,
+            model_name=detector.model_name,
+            model_version=detector.model_version,
+            defect_type=prediction.defect_type,
+            confidence=prediction.confidence,
+            bounding_box=prediction.bounding_box,
+        )
+        db.add(result)
+        results.append(result)
+
+    db.commit()
+    for result in results:
+        db.refresh(result)
+    return results
