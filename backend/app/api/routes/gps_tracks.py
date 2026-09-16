@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, FieldStaffUser
 from app.db.session import get_db
 from app.models.gps_track import GPSTrack
 from app.models.road import Road
@@ -14,7 +15,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/gps-tracks/geojson")
-def gps_tracks_geojson(db: DbSession):
+def gps_tracks_geojson(db: DbSession, current_user: AuthenticatedUser):
     rows = db.execute(
         select(
             GPSTrack.track_id,
@@ -48,7 +49,7 @@ def gps_tracks_geojson(db: DbSession):
 
 
 @router.get("/roads/{road_id}/gps-tracks", response_model=list[GPSTrackResponse])
-def list_gps_tracks(road_id: int, db: DbSession):
+def list_gps_tracks(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
@@ -60,7 +61,7 @@ def list_gps_tracks(road_id: int, db: DbSession):
 
 
 @router.get("/gps-tracks/{track_id}", response_model=GPSTrackResponse)
-def get_gps_track(track_id: int, db: DbSession):
+def get_gps_track(track_id: int, db: DbSession, current_user: AuthenticatedUser):
     track = db.get(GPSTrack, track_id)
     if track is None:
         raise HTTPException(status_code=404, detail="GPS track not found")
@@ -76,6 +77,7 @@ def create_gps_track(
     road_id: int,
     payload: GPSTrackCreate,
     db: DbSession,
+    current_user: FieldStaffUser,
 ):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
