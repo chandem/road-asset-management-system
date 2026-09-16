@@ -83,9 +83,11 @@ def test_validate_links_rejects_section_from_another_road():
 
 def test_validate_links_rejects_defect_from_another_section():
     section = make_section(10, 1)
+    other_section = make_section(11, 1)
     defect = make_defect(11)
     db = FakeDB({
         (RoadSection, 10): section,
+        (RoadSection, 11): other_section,
         (RoadDefect, 20): defect,
     })
 
