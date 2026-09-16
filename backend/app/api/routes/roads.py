@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, EngineerUser
 from app.db.session import get_db
 from app.models.road import Road
 from app.schemas.road import RoadCreate, RoadGeoJSONResponse, RoadResponse
@@ -13,17 +14,15 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("", response_model=list[RoadResponse])
-def list_roads(db: DbSession):
+def list_roads(db: DbSession, current_user: AuthenticatedUser):
     return db.scalars(select(Road).order_by(Road.road_id)).all()
 
 
 @router.get("/geojson", response_model=RoadGeoJSONResponse)
-def road_geojson(db: DbSession):
+def road_geojson(db: DbSession, current_user: AuthenticatedUser):
     rows = db.execute(
-        select(
-            Road,
-            func.ST_AsGeoJSON(Road.geometry).label("geometry_json"),
-        ).order_by(Road.road_id)
+        select(Road, func.ST_AsGeoJSON(Road.geometry).label("geometry_json"))
+        .order_by(Road.road_id)
     ).all()
 
     features = []
@@ -53,7 +52,7 @@ def road_geojson(db: DbSession):
 
 
 @router.get("/{road_id}", response_model=RoadResponse)
-def get_road(road_id: int, db: DbSession):
+def get_road(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     road = db.get(Road, road_id)
     if road is None:
         raise HTTPException(status_code=404, detail="Road not found")
@@ -61,7 +60,7 @@ def get_road(road_id: int, db: DbSession):
 
 
 @router.post("", response_model=RoadResponse, status_code=201)
-def create_road(payload: RoadCreate, db: DbSession):
+def create_road(payload: RoadCreate, db: DbSession, current_user: EngineerUser):
     road = Road(
         organization_id=payload.organization_id,
         road_code=payload.road_code,
