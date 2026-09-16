@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, FieldStaffUser
 from app.db.session import get_db
 from app.models.inspection import Inspection
 from app.models.road_defect import RoadDefect
@@ -15,7 +16,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/defects/geojson")
-def defects_geojson(db: DbSession):
+def defects_geojson(db: DbSession, current_user: AuthenticatedUser):
     rows = db.execute(
         select(
             RoadDefect.defect_id,
@@ -55,7 +56,7 @@ def defects_geojson(db: DbSession):
 
 
 @router.get("/inspections/{inspection_id}/defects", response_model=list[RoadDefectResponse])
-def list_defects(inspection_id: int, db: DbSession):
+def list_defects(inspection_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Inspection, inspection_id) is None:
         raise HTTPException(status_code=404, detail="Inspection not found")
 
@@ -67,7 +68,7 @@ def list_defects(inspection_id: int, db: DbSession):
 
 
 @router.get("/defects/{defect_id}", response_model=RoadDefectResponse)
-def get_defect(defect_id: int, db: DbSession):
+def get_defect(defect_id: int, db: DbSession, current_user: AuthenticatedUser):
     defect = db.get(RoadDefect, defect_id)
     if defect is None:
         raise HTTPException(status_code=404, detail="Road defect not found")
@@ -79,7 +80,12 @@ def get_defect(defect_id: int, db: DbSession):
     response_model=RoadDefectResponse,
     status_code=201,
 )
-def create_defect(inspection_id: int, payload: RoadDefectCreate, db: DbSession):
+def create_defect(
+    inspection_id: int,
+    payload: RoadDefectCreate,
+    db: DbSession,
+    current_user: FieldStaffUser,
+):
     inspection = db.get(Inspection, inspection_id)
     if inspection is None:
         raise HTTPException(status_code=404, detail="Inspection not found")
