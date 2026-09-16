@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import AdminUser
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, ROLES
@@ -13,12 +14,12 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/users", response_model=list[UserResponse])
-def list_users(db: DbSession):
+def list_users(db: DbSession, current_user: AdminUser):
     return db.scalars(select(User).order_by(User.full_name, User.user_id)).all()
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: DbSession):
+def get_user(user_id: int, db: DbSession, current_user: AdminUser):
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -26,7 +27,7 @@ def get_user(user_id: int, db: DbSession):
 
 
 @router.post("/users", response_model=UserResponse, status_code=201)
-def create_user(payload: UserCreate, db: DbSession):
+def create_user(payload: UserCreate, db: DbSession, current_user: AdminUser):
     if payload.role not in ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Use one of: {', '.join(ROLES)}")
 
