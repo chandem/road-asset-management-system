@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 from uuid import uuid4
@@ -54,6 +55,22 @@ async def upload_image(
     if defect_id is not None and db.get(RoadDefect, defect_id) is None:
         raise HTTPException(status_code=400, detail="Defect not found")
 
+    if latitude is not None and longitude is not None:
+        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            raise HTTPException(status_code=400, detail="Invalid GPS coordinates")
+    elif latitude is not None or longitude is not None:
+        raise HTTPException(status_code=400, detail="Latitude and longitude must be provided together")
+
+    captured_at_value = None
+    if captured_at:
+        try:
+            captured_at_value = datetime.fromisoformat(captured_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="captured_at must be a valid ISO 8601 timestamp",
+            ) from exc
+
     data = await file.read()
     if len(data) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="Image must be 10 MB or smaller")
@@ -66,8 +83,6 @@ async def upload_image(
 
     geometry = None
     if latitude is not None and longitude is not None:
-        if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-            raise HTTPException(status_code=400, detail="Invalid GPS coordinates")
         geometry = func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326)
 
     image = Image(
@@ -75,7 +90,7 @@ async def upload_image(
         defect_id=defect_id,
         file_name=file.filename or stored_name,
         file_path=str(file_path),
-        captured_at=captured_at,
+        captured_at=captured_at_value,
         latitude=latitude,
         longitude=longitude,
         geometry=geometry,
