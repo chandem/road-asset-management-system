@@ -25,13 +25,13 @@ def list_maintenance(road_id: int, db: DbSession):
     return db.scalars(
         select(MaintenanceActivity)
         .where(MaintenanceActivity.road_id == road_id)
-        .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.activity_id)
+        .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)
     ).all()
 
 
-@router.get("/maintenance/{activity_id}", response_model=MaintenanceActivityResponse)
-def get_maintenance(activity_id: int, db: DbSession):
-    activity = db.get(MaintenanceActivity, activity_id)
+@router.get("/maintenance/{maintenance_id}", response_model=MaintenanceActivityResponse)
+def get_maintenance(maintenance_id: int, db: DbSession):
+    activity = db.get(MaintenanceActivity, maintenance_id)
     if activity is None:
         raise HTTPException(status_code=404, detail="Maintenance activity not found")
     return activity
@@ -66,11 +66,12 @@ def create_maintenance(
         road_id=road_id,
         section_id=payload.section_id,
         activity_type=payload.activity_type,
+        priority=payload.priority,
         planned_date=payload.planned_date,
         completed_date=payload.completed_date,
-        contractor=payload.contractor,
         estimated_cost=payload.estimated_cost,
         actual_cost=payload.actual_cost,
+        contractor=payload.contractor,
         status=payload.status,
         description=payload.description,
     )
