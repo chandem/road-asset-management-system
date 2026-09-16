@@ -16,4 +16,8 @@ export function getRoadGeoJSON() {
   return request("/roads/geojson");
 }
 
+export function getGPSTrackGeoJSON() {
+  return request("/gps-tracks/geojson");
+}
+
 export { API_BASE };
