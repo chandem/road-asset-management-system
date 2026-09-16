@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, JSON, String, Text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.road import Base
@@ -25,5 +26,5 @@ class MaintenanceHistory(Base):
     changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    old_values: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
-    new_values: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
+    old_values: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
+    new_values: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
