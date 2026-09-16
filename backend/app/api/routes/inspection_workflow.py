@@ -10,6 +10,7 @@ from app.models.ai_detection_result import AIDetectionResult
 from app.models.image import Image
 from app.models.inspection import Inspection
 from app.models.road_defect import RoadDefect
+from app.models.road_section import RoadSection
 
 router = APIRouter(tags=["Inspection Workflow"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -47,6 +48,17 @@ def get_inspection_workflow(
             .order_by(AIDetectionResult.detection_id)
         ).all()
 
+    section_ids = {inspection.section_id}
+    section_ids.update(defect.section_id for defect in defects if defect.section_id is not None)
+    sections = {}
+    if section_ids:
+        sections = {
+            section.section_id: section
+            for section in db.scalars(
+                select(RoadSection).where(RoadSection.section_id.in_(section_ids))
+            ).all()
+        }
+
     return {
         "inspection": {
             "inspection_id": inspection.inspection_id,
@@ -56,6 +68,7 @@ def get_inspection_workflow(
             "condition_rating": inspection.condition_rating,
             "weather": inspection.weather,
             "notes": inspection.notes,
+            "road_id": sections.get(inspection.section_id).road_id if sections.get(inspection.section_id) else None,
         },
         "summary": {
             "defect_count": len(defects),
@@ -66,6 +79,7 @@ def get_inspection_workflow(
             {
                 "defect_id": defect.defect_id,
                 "section_id": defect.section_id,
+                "road_id": sections.get(defect.section_id).road_id if sections.get(defect.section_id) else None,
                 "defect_type": defect.defect_type,
                 "severity": defect.severity,
                 "chainage_km": defect.chainage_km,
