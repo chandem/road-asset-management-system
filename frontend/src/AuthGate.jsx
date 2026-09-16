@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import App from "./App";
 import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
+import MaintenanceAnalytics from "./MaintenanceAnalytics";
 import { API_BASE } from "./api";
 import { clearToken, getToken, setToken } from "./auth";
 
@@ -81,6 +82,7 @@ export default function AuthGate() {
       </div>
       <App />
       <InspectionWorkflowPanel />
+      <MaintenanceAnalytics />
     </>
   );
 }
