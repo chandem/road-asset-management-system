@@ -9,3 +9,4 @@ python-multipart
 ultralytics
 python-jose[cryptography]
 passlib[bcrypt]
+pytest
