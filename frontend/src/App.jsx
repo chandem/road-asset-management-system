@@ -5,11 +5,13 @@ import "leaflet/dist/leaflet.css";
 import {
   createDefect,
   createInspection,
+  createMaintenance,
   getAIDetections,
   getDefectGeoJSON,
   getGPSTrackGeoJSON,
   getRoadAssetGeoJSON,
   getRoadGeoJSON,
+  getRoadMaintenance,
   getRoadSectionGeoJSON,
   getRoadSections,
   getRoads,
@@ -57,6 +59,15 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [maintenanceRoadId, setMaintenanceRoadId] = useState("");
+  const [maintenance, setMaintenance] = useState([]);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
+  const [maintenanceForm, setMaintenanceForm] = useState({
+    section_id: "", activity_type: "", priority: "medium", planned_date: "",
+    completed_date: "", estimated_cost: "", actual_cost: "", contractor: "",
+    status: "planned", description: "",
+  });
+
   async function loadDashboard() {
     try {
       setError("");
@@ -74,6 +85,7 @@ function App() {
       setAssetGeoJSON(combine(aa));
       setDefectGeoJSON(d);
       setSections((await Promise.all(ids.map((id) => getRoadSections(id)))).flat());
+      if (!maintenanceRoadId && ids.length) setMaintenanceRoadId(String(ids[0]));
     } catch (e) {
       setError(e.message || "Unable to connect to RAMS API");
     } finally {
@@ -81,10 +93,27 @@ function App() {
     }
   }
 
+  async function loadMaintenance(roadId = maintenanceRoadId) {
+    if (!roadId) {
+      setMaintenance([]);
+      return;
+    }
+    setMaintenanceLoading(true);
+    try {
+      setMaintenance(await getRoadMaintenance(Number(roadId)));
+    } catch (e) {
+      setMessage(`Maintenance error: ${e.message}`);
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  }
+
   useEffect(() => { loadDashboard(); }, []);
+  useEffect(() => { if (maintenanceRoadId) loadMaintenance(maintenanceRoadId); }, [maintenanceRoadId]);
 
   const update = (k, v) => setForm((c) => ({ ...c, [k]: v }));
   const updatePhoto = (k, v) => setPhoto((c) => ({ ...c, [k]: v }));
+  const updateMaintenance = (k, v) => setMaintenanceForm((c) => ({ ...c, [k]: v }));
   const toggleLayer = (k) => setVisible((c) => ({ ...c, [k]: !c[k] }));
   const openForm = (t) => { setFormType(t); setMessage(""); setShowForm(true); };
 
@@ -139,6 +168,41 @@ function App() {
     }
   }
 
+  async function submitMaintenance(e) {
+    e.preventDefault();
+    if (!maintenanceRoadId) {
+      setMessage("Select a road before creating maintenance.");
+      return;
+    }
+    if (!maintenanceForm.activity_type.trim()) {
+      setMessage("Enter a maintenance activity type.");
+      return;
+    }
+    setSaving(true);
+    setMessage("");
+    try {
+      const r = await createMaintenance(Number(maintenanceRoadId), {
+        section_id: maintenanceForm.section_id ? Number(maintenanceForm.section_id) : null,
+        activity_type: maintenanceForm.activity_type.trim(),
+        priority: maintenanceForm.priority || null,
+        planned_date: maintenanceForm.planned_date || null,
+        completed_date: maintenanceForm.completed_date || null,
+        estimated_cost: maintenanceForm.estimated_cost === "" ? null : Number(maintenanceForm.estimated_cost),
+        actual_cost: maintenanceForm.actual_cost === "" ? null : Number(maintenanceForm.actual_cost),
+        contractor: maintenanceForm.contractor || null,
+        status: maintenanceForm.status,
+        description: maintenanceForm.description || null,
+      });
+      setMaintenanceForm({ section_id: "", activity_type: "", priority: "medium", planned_date: "", completed_date: "", estimated_cost: "", actual_cost: "", contractor: "", status: "planned", description: "" });
+      setMessage(`Maintenance #${r.maintenance_id} created successfully.`);
+      await loadMaintenance(maintenanceRoadId);
+    } catch (e) {
+      setMessage(`Maintenance error: ${e.message}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function submitPhoto(e) {
     e.preventDefault();
     if (!photo.file) { setMessage("Select a road image first."); return; }
@@ -184,6 +248,11 @@ function App() {
     try { setAiResults(await getAIDetections(uploadedImageId)); } catch (e) { setMessage(`AI results error: ${e.message}`); }
   }
 
+  const selectedMaintenanceSections = sections.filter((s) => String(s.road_id) === String(maintenanceRoadId));
+  const estimatedTotal = maintenance.reduce((sum, x) => sum + (Number(x.estimated_cost) || 0), 0);
+  const actualTotal = maintenance.reduce((sum, x) => sum + (Number(x.actual_cost) || 0), 0);
+  const completedCount = maintenance.filter((x) => String(x.status).toLowerCase() === "completed").length;
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -201,6 +270,39 @@ function App() {
         </section>
 
         <section className="action-panel"><h2>Field Data Entry</h2><p>Create inspections, defects and field photos.</p><div className="actions"><button onClick={() => openForm("inspection")}>+ New Inspection</button><button onClick={() => openForm("defect")}>+ New Defect</button></div></section>
+
+        <section className="form-panel">
+          <div className="form-header"><div><h2>🛠️ Maintenance Management</h2><p>Plan, track and review road maintenance activities and costs.</p></div><button type="button" onClick={() => loadMaintenance()}>Refresh</button></div>
+          <div className="form-grid">
+            <label>Road<select value={maintenanceRoadId} onChange={(e) => setMaintenanceRoadId(e.target.value)}><option value="">Select road</option>{roads.map((r) => <option key={r.road_id} value={r.road_id}>{r.road_code} · {r.road_name}</option>)}</select></label>
+            <div className="card"><span>Activities</span><strong>{maintenanceLoading ? "…" : maintenance.length}</strong></div>
+            <div className="card"><span>Completed</span><strong>{completedCount}</strong></div>
+            <div className="card"><span>Estimated Cost</span><strong>{estimatedTotal.toLocaleString()}</strong></div>
+            <div className="card"><span>Actual Cost</span><strong>{actualTotal.toLocaleString()}</strong></div>
+          </div>
+
+          <form onSubmit={submitMaintenance}>
+            <h3>New Maintenance Activity</h3>
+            <div className="form-grid">
+              <label>Section<select value={maintenanceForm.section_id} onChange={(e) => updateMaintenance("section_id", e.target.value)}><option value="">Whole road</option>{selectedMaintenanceSections.map((s) => <option key={s.section_id} value={s.section_id}>{s.section_code} ({s.start_chainage}–{s.end_chainage} km)</option>)}</select></label>
+              <label>Activity Type<input value={maintenanceForm.activity_type} onChange={(e) => updateMaintenance("activity_type", e.target.value)} placeholder="Routine grading, pothole repair…" required /></label>
+              <label>Priority<select value={maintenanceForm.priority} onChange={(e) => updateMaintenance("priority", e.target.value)}><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label>
+              <label>Status<select value={maintenanceForm.status} onChange={(e) => updateMaintenance("status", e.target.value)}><option>planned</option><option>in_progress</option><option>completed</option><option>cancelled</option></select></label>
+              <label>Planned Date<input type="date" value={maintenanceForm.planned_date} onChange={(e) => updateMaintenance("planned_date", e.target.value)} /></label>
+              <label>Completed Date<input type="date" value={maintenanceForm.completed_date} onChange={(e) => updateMaintenance("completed_date", e.target.value)} /></label>
+              <label>Estimated Cost<input type="number" min="0" step="0.01" value={maintenanceForm.estimated_cost} onChange={(e) => updateMaintenance("estimated_cost", e.target.value)} /></label>
+              <label>Actual Cost<input type="number" min="0" step="0.01" value={maintenanceForm.actual_cost} onChange={(e) => updateMaintenance("actual_cost", e.target.value)} /></label>
+              <label>Contractor<input value={maintenanceForm.contractor} onChange={(e) => updateMaintenance("contractor", e.target.value)} /></label>
+              <label>Description<textarea value={maintenanceForm.description} onChange={(e) => updateMaintenance("description", e.target.value)} /></label>
+            </div>
+            <div className="form-footer"><button type="submit" disabled={saving || !maintenanceRoadId}>{saving ? "Saving…" : "Create Maintenance"}</button>{message && <span>{message}</span>}</div>
+          </form>
+
+          <div className="maintenance-list">
+            <h3>Maintenance History</h3>
+            {maintenanceLoading ? <p>Loading maintenance records…</p> : maintenance.length === 0 ? <p>No maintenance activities recorded for this road.</p> : <div className="table-wrap"><table><thead><tr><th>Activity</th><th>Section</th><th>Priority</th><th>Status</th><th>Planned</th><th>Completed</th><th>Estimated</th><th>Actual</th><th>Contractor</th></tr></thead><tbody>{maintenance.map((m) => { const section = sections.find((s) => s.section_id === m.section_id); return <tr key={m.maintenance_id}><td>{m.activity_type}</td><td>{section?.section_code || m.section_id || "Whole road"}</td><td>{m.priority || "—"}</td><td>{m.status}</td><td>{m.planned_date || "—"}</td><td>{m.completed_date || "—"}</td><td>{m.estimated_cost == null ? "—" : Number(m.estimated_cost).toLocaleString()}</td><td>{m.actual_cost == null ? "—" : Number(m.actual_cost).toLocaleString()}</td><td>{m.contractor || "—"}</td></tr>; })}</tbody></table></div>}
+          </div>
+        </section>
 
         <section className="form-panel">
           <div className="form-header"><div><h2>📷 Field Photo + AI Inspection</h2><p>Upload a road photo, capture GPS, then run the configured road-defect model.</p></div></div>
