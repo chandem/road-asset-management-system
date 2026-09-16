@@ -23,6 +23,8 @@ export function getRoadSectionGeoJSON(roadId) { return request(`/roads/${roadId}
 export function getRoadAssetGeoJSON(roadId) { return request(`/roads/${roadId}/assets/geojson`); }
 export function getDefectGeoJSON() { return request("/defects/geojson"); }
 export function getRoadSections(roadId) { return request(`/roads/${roadId}/sections`); }
+export function getRoadInspections(roadId) { return request(`/roads/${roadId}/inspections`); }
+export function getInspection(inspectionId) { return request(`/inspections/${inspectionId}`); }
 export function createInspection(sectionId, payload) {
   return request(`/sections/${sectionId}/inspections`, { method: "POST", body: JSON.stringify(payload) });
 }
