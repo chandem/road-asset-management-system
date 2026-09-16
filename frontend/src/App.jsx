@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
+import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getRoadGeoJSON, getRoads } from "./api";
 
@@ -10,7 +11,7 @@ function FitRoads({ data }) {
 
   useEffect(() => {
     if (!data?.features?.length) return;
-    const layer = window.L.geoJSON(data);
+    const layer = L.geoJSON(data);
     const bounds = layer.getBounds();
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
   }, [data, map]);
