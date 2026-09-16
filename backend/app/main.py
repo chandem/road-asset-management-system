@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 
+from app.api.routes.ai_detection import router as ai_detection_router
 from app.api.routes.chainage_points import router as chainage_points_router
 from app.api.routes.gps_tracks import router as gps_tracks_router
+from app.api.routes.images import router as images_router
 from app.api.routes.inspections import router as inspections_router
 from app.api.routes.maintenance import router as maintenance_router
 from app.api.routes.road_assets import router as road_assets_router
@@ -12,7 +14,7 @@ from app.core.config import settings
 
 app = FastAPI(
     title=f"{settings.app_name} API",
-    version="0.8.0",
+    version="0.9.0",
     debug=settings.debug,
 )
 
@@ -24,6 +26,8 @@ app.include_router(inspections_router, prefix="/api/v1")
 app.include_router(road_defects_router, prefix="/api/v1")
 app.include_router(maintenance_router, prefix="/api/v1")
 app.include_router(gps_tracks_router, prefix="/api/v1")
+app.include_router(images_router, prefix="/api/v1")
+app.include_router(ai_detection_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])
