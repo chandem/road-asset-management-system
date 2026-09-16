@@ -1,0 +1,13 @@
+# Replace these paths with your prepared YOLO-format dataset.
+# Keep the dataset outside Git if it is large.
+path: ../datasets/rdd2022
+train: images/train
+val: images/val
+
+# Update this list to exactly match your dataset annotation classes.
+# Example RDD-style classes:
+names:
+  0: longitudinal_crack
+  1: transverse_crack
+  2: alligator_crack
+  3: pothole
