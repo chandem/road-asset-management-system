@@ -82,11 +82,15 @@ def run_ai_detection(image_id: int, db: DbSession):
     if image is None:
         raise HTTPException(status_code=404, detail="Image not found")
 
-    detector = get_detector()
     try:
+        detector = get_detector()
         predictions = detector.predict(image.file_path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"AI inference failed: {exc}") from exc
 
     results = []
     for prediction in predictions:
