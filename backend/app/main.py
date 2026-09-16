@@ -10,6 +10,7 @@ from app.api.routes.road_assets import router as road_assets_router
 from app.api.routes.road_defects import router as road_defects_router
 from app.api.routes.road_sections import router as road_sections_router
 from app.api.routes.roads import router as roads_router
+from app.api.routes.users import router as users_router
 from app.core.config import settings
 
 app = FastAPI(
@@ -28,6 +29,7 @@ app.include_router(maintenance_router, prefix="/api/v1")
 app.include_router(gps_tracks_router, prefix="/api/v1")
 app.include_router(images_router, prefix="/api/v1")
 app.include_router(ai_detection_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["System"])
