@@ -41,4 +41,12 @@ export function uploadImage({ file, inspectionId, defectId, capturedAt, latitude
   return request("/images/upload", { method: "POST", body: formData });
 }
 
+export function runAIDetection(imageId) {
+  return request(`/images/${imageId}/ai-detect`, { method: "POST" });
+}
+
+export function getAIDetections(imageId) {
+  return request(`/images/${imageId}/ai-detections`);
+}
+
 export { API_BASE };
