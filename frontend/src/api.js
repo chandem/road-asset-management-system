@@ -36,6 +36,9 @@ export function getDefectMaintenance(defectId) { return request(`/defects/${defe
 export function createMaintenance(roadId, payload) {
   return request(`/roads/${roadId}/maintenance`, { method: "POST", body: JSON.stringify(payload) });
 }
+export function updateMaintenance(maintenanceId, payload) {
+  return request(`/maintenance/${maintenanceId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
 export function createInspection(sectionId, payload) {
   return request(`/sections/${sectionId}/inspections`, { method: "POST", body: JSON.stringify(payload) });
 }
