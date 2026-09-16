@@ -1,9 +1,13 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
 async function request(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(options.headers || {}),
+    },
   });
   if (!response.ok) {
     const detail = await response.text();
@@ -24,6 +28,17 @@ export function createInspection(sectionId, payload) {
 }
 export function createDefect(inspectionId, payload) {
   return request(`/inspections/${inspectionId}/defects`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function uploadImage({ file, inspectionId, defectId, capturedAt, latitude, longitude }) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (inspectionId) formData.append("inspection_id", inspectionId);
+  if (defectId) formData.append("defect_id", defectId);
+  if (capturedAt) formData.append("captured_at", capturedAt);
+  if (latitude !== null && latitude !== undefined) formData.append("latitude", latitude);
+  if (longitude !== null && longitude !== undefined) formData.append("longitude", longitude);
+  return request("/images/upload", { method: "POST", body: formData });
 }
 
 export { API_BASE };
