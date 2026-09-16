@@ -18,6 +18,9 @@ class MaintenanceActivity(Base):
     section_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("rams.road_sections.section_id", ondelete="SET NULL")
     )
+    source_defect_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("rams.road_defects.defect_id", ondelete="SET NULL")
+    )
     activity_type: Mapped[str] = mapped_column(String(100), nullable=False)
     priority: Mapped[Optional[str]] = mapped_column(String(30))
     planned_date: Mapped[Optional[date]] = mapped_column(Date)
