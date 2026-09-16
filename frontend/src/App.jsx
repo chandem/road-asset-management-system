@@ -3,6 +3,7 @@ import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
+  getDefectGeoJSON,
   getGPSTrackGeoJSON,
   getRoadAssetGeoJSON,
   getRoadGeoJSON,
@@ -33,11 +34,13 @@ function App() {
   const [gpsGeoJSON, setGpsGeoJSON] = useState(null);
   const [sectionGeoJSON, setSectionGeoJSON] = useState(null);
   const [assetGeoJSON, setAssetGeoJSON] = useState(null);
+  const [defectGeoJSON, setDefectGeoJSON] = useState(null);
   const [visible, setVisible] = useState({
     roads: true,
     gps: true,
     sections: true,
     assets: true,
+    defects: true,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,19 +48,18 @@ function App() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        const [roadData, geoData, gpsData] = await Promise.all([
+        const [roadData, geoData, gpsData, defectData] = await Promise.all([
           getRoads(),
           getRoadGeoJSON(),
           getGPSTrackGeoJSON(),
+          getDefectGeoJSON(),
         ]);
 
         const roadIds = roadData.map((road) => road.road_id);
-        const sectionResults = await Promise.all(
-          roadIds.map((roadId) => getRoadSectionGeoJSON(roadId)),
-        );
-        const assetResults = await Promise.all(
-          roadIds.map((roadId) => getRoadAssetGeoJSON(roadId)),
-        );
+        const [sectionResults, assetResults] = await Promise.all([
+          Promise.all(roadIds.map((roadId) => getRoadSectionGeoJSON(roadId))),
+          Promise.all(roadIds.map((roadId) => getRoadAssetGeoJSON(roadId))),
+        ]);
 
         const combine = (collections) => ({
           type: "FeatureCollection",
@@ -69,6 +71,7 @@ function App() {
         setGpsGeoJSON(gpsData);
         setSectionGeoJSON(combine(sectionResults));
         setAssetGeoJSON(combine(assetResults));
+        setDefectGeoJSON(defectData);
       } catch (err) {
         setError(err.message || "Unable to connect to RAMS API");
       } finally {
@@ -101,13 +104,14 @@ function App() {
           <div className="card"><span>GPS Tracks</span><strong>{loading ? "…" : gpsGeoJSON?.features?.length ?? 0}</strong></div>
           <div className="card"><span>Sections</span><strong>{loading ? "…" : sectionGeoJSON?.features?.length ?? 0}</strong></div>
           <div className="card"><span>Assets</span><strong>{loading ? "…" : assetGeoJSON?.features?.length ?? 0}</strong></div>
+          <div className="card"><span>Defects</span><strong>{loading ? "…" : defectGeoJSON?.features?.length ?? 0}</strong></div>
         </section>
 
         <section className="map-panel">
           <div className="panel-heading">
             <div>
-              <h2>GIS Road Asset Map</h2>
-              <p>{loading ? "Loading spatial data…" : "Roads, GPS tracks, sections and assets are available as map layers."}</p>
+              <h2>GIS Road Asset & Defect Map</h2>
+              <p>{loading ? "Loading spatial data…" : "Roads, GPS tracks, sections, assets and defects are available as map layers."}</p>
             </div>
             <div className="layer-controls">
               {[
@@ -115,6 +119,7 @@ function App() {
                 ["gps", "GPS"],
                 ["sections", "Sections"],
                 ["assets", "Assets"],
+                ["defects", "Defects"],
               ].map(([key, label]) => (
                 <label key={key}>
                   <input
@@ -188,8 +193,24 @@ function App() {
               />
             )}
 
+            {visible.defects && defectGeoJSON && (
+              <GeoJSON
+                data={defectGeoJSON}
+                pointToLayer={(feature, latlng) =>
+                  L.circleMarker(latlng, { radius: 8, weight: 2 })
+                }
+                style={{ weight: 4 }}
+                onEachFeature={(feature, layer) => {
+                  const p = feature.properties || {};
+                  layer.bindPopup(
+                    `<strong>${p.defect_type || "Road defect"}</strong><br/>Severity: ${p.severity || "—"}<br/>Chainage: ${p.chainage_km ?? "—"} km<br/>Detected by: ${p.detected_by || "manual"}`,
+                  );
+                }}
+              />
+            )}
+
             <FitLayers
-              layers={[roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON]}
+              layers={[roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON]}
             />
           </MapContainer>
         </section>
