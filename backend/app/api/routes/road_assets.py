@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, EngineerUser
 from app.db.session import get_db
 from app.models.road import Road
 from app.models.road_asset import RoadAsset
@@ -16,7 +17,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/roads/{road_id}/assets", response_model=list[RoadAssetResponse])
-def list_assets(road_id: int, db: DbSession):
+def list_assets(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
@@ -28,7 +29,7 @@ def list_assets(road_id: int, db: DbSession):
 
 
 @router.get("/roads/{road_id}/assets/geojson")
-def assets_geojson(road_id: int, db: DbSession):
+def assets_geojson(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
@@ -68,7 +69,7 @@ def assets_geojson(road_id: int, db: DbSession):
 
 
 @router.get("/assets/{asset_id}", response_model=RoadAssetResponse)
-def get_asset(asset_id: int, db: DbSession):
+def get_asset(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
     asset = db.get(RoadAsset, asset_id)
     if asset is None:
         raise HTTPException(status_code=404, detail="Road asset not found")
@@ -76,7 +77,12 @@ def get_asset(asset_id: int, db: DbSession):
 
 
 @router.post("/roads/{road_id}/assets", response_model=RoadAssetResponse, status_code=201)
-def create_asset(road_id: int, payload: RoadAssetCreate, db: DbSession):
+def create_asset(
+    road_id: int,
+    payload: RoadAssetCreate,
+    db: DbSession,
+    current_user: EngineerUser,
+):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
