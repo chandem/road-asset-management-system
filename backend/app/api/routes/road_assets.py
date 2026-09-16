@@ -1,4 +1,5 @@
 from typing import Annotated
+import json
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -24,6 +25,46 @@ def list_assets(road_id: int, db: DbSession):
         .where(RoadAsset.road_id == road_id)
         .order_by(RoadAsset.chainage_km, RoadAsset.asset_id)
     ).all()
+
+
+@router.get("/roads/{road_id}/assets/geojson")
+def assets_geojson(road_id: int, db: DbSession):
+    if db.get(Road, road_id) is None:
+        raise HTTPException(status_code=404, detail="Road not found")
+
+    rows = db.execute(
+        select(
+            RoadAsset.asset_id,
+            RoadAsset.section_id,
+            RoadAsset.asset_type,
+            RoadAsset.asset_code,
+            RoadAsset.chainage_km,
+            RoadAsset.description,
+            RoadAsset.condition_rating,
+            func.ST_AsGeoJSON(RoadAsset.geometry),
+        )
+        .where(RoadAsset.road_id == road_id)
+        .order_by(RoadAsset.chainage_km, RoadAsset.asset_id)
+    ).all()
+
+    features = []
+    for row in rows:
+        geometry = json.loads(row[7]) if row[7] else None
+        features.append({
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": {
+                "asset_id": row[0],
+                "section_id": row[1],
+                "asset_type": row[2],
+                "asset_code": row[3],
+                "chainage_km": float(row[4]) if row[4] is not None else None,
+                "description": row[5],
+                "condition_rating": float(row[6]) if row[6] is not None else None,
+            },
+        })
+
+    return {"type": "FeatureCollection", "features": features}
 
 
 @router.get("/assets/{asset_id}", response_model=RoadAssetResponse)
