@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, EngineerUser, InspectorUser
 from app.db.session import get_db
 from app.models.ai_detection_result import AIDetectionResult
 from app.models.image import Image
@@ -21,7 +22,7 @@ DbSession = Annotated[Session, Depends(get_db)]
     "/images/{image_id}/ai-detections",
     response_model=list[AIDetectionResultResponse],
 )
-def list_ai_detections(image_id: int, db: DbSession):
+def list_ai_detections(image_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Image, image_id) is None:
         raise HTTPException(status_code=404, detail="Image not found")
 
@@ -33,7 +34,7 @@ def list_ai_detections(image_id: int, db: DbSession):
 
 
 @router.get("/ai-detections/{detection_id}", response_model=AIDetectionResultResponse)
-def get_ai_detection(detection_id: int, db: DbSession):
+def get_ai_detection(detection_id: int, db: DbSession, current_user: AuthenticatedUser):
     detection = db.get(AIDetectionResult, detection_id)
     if detection is None:
         raise HTTPException(status_code=404, detail="AI detection result not found")
@@ -49,6 +50,7 @@ def create_ai_detection(
     image_id: int,
     payload: AIDetectionResultCreate,
     db: DbSession,
+    current_user: EngineerUser,
 ):
     if db.get(Image, image_id) is None:
         raise HTTPException(status_code=404, detail="Image not found")
@@ -77,7 +79,11 @@ def create_ai_detection(
     "/images/{image_id}/ai-detect",
     response_model=list[AIDetectionResultResponse],
 )
-def run_ai_detection(image_id: int, db: DbSession):
+def run_ai_detection(
+    image_id: int,
+    db: DbSession,
+    current_user: InspectorUser,
+):
     image = db.get(Image, image_id)
     if image is None:
         raise HTTPException(status_code=404, detail="Image not found")
