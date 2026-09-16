@@ -24,3 +24,24 @@ class RoadResponse(RoadBase):
 
     road_id: int
     organization_id: Optional[int] = None
+
+
+class RoadGeoJSONProperties(BaseModel):
+    road_id: int
+    road_code: str
+    road_name: str
+    road_class: Optional[str] = None
+    surface_type: Optional[str] = None
+    total_length_km: Optional[float] = None
+    status: str
+
+
+class RoadGeoJSONFeature(BaseModel):
+    type: str = "Feature"
+    geometry: Optional[dict] = None
+    properties: RoadGeoJSONProperties
+
+
+class RoadGeoJSONResponse(BaseModel):
+    type: str = "FeatureCollection"
+    features: list[RoadGeoJSONFeature]
