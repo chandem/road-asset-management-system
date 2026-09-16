@@ -1,7 +1,8 @@
 from typing import Annotated
+import json
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -23,6 +24,46 @@ def list_sections(road_id: int, db: DbSession):
         .where(RoadSection.road_id == road_id)
         .order_by(RoadSection.start_chainage)
     ).all()
+
+
+@router.get("/roads/{road_id}/sections/geojson")
+def sections_geojson(road_id: int, db: DbSession):
+    if db.get(Road, road_id) is None:
+        raise HTTPException(status_code=404, detail="Road not found")
+
+    rows = db.execute(
+        select(
+            RoadSection.section_id,
+            RoadSection.section_code,
+            RoadSection.start_chainage,
+            RoadSection.end_chainage,
+            RoadSection.length_km,
+            RoadSection.surface_type,
+            RoadSection.condition_rating,
+            func.ST_AsGeoJSON(RoadSection.geometry),
+        )
+        .where(RoadSection.road_id == road_id)
+        .order_by(RoadSection.start_chainage)
+    ).all()
+
+    features = []
+    for row in rows:
+        geometry = json.loads(row[7]) if row[7] else None
+        features.append({
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": {
+                "section_id": row[0],
+                "section_code": row[1],
+                "start_chainage": float(row[2]),
+                "end_chainage": float(row[3]),
+                "length_km": float(row[4]) if row[4] is not None else None,
+                "surface_type": row[5],
+                "condition_rating": float(row[6]) if row[6] is not None else None,
+            },
+        })
+
+    return {"type": "FeatureCollection", "features": features}
 
 
 @router.get("/sections/{section_id}", response_model=RoadSectionResponse)
@@ -47,8 +88,6 @@ def create_section(
         raise HTTPException(status_code=404, detail="Road not found")
 
     if payload.geometry_wkt:
-        from sqlalchemy import func
-
         geometry = func.ST_GeomFromText(payload.geometry_wkt, 4326)
     else:
         geometry = None
