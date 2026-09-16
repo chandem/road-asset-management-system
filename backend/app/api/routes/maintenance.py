@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, EngineerUser
 from app.db.session import get_db
 from app.models.maintenance_activity import MaintenanceActivity
 from app.models.road import Road
@@ -18,7 +19,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/roads/{road_id}/maintenance", response_model=list[MaintenanceActivityResponse])
-def list_maintenance(road_id: int, db: DbSession):
+def list_maintenance(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
@@ -30,7 +31,7 @@ def list_maintenance(road_id: int, db: DbSession):
 
 
 @router.get("/maintenance/{maintenance_id}", response_model=MaintenanceActivityResponse)
-def get_maintenance(maintenance_id: int, db: DbSession):
+def get_maintenance(maintenance_id: int, db: DbSession, current_user: AuthenticatedUser):
     activity = db.get(MaintenanceActivity, maintenance_id)
     if activity is None:
         raise HTTPException(status_code=404, detail="Maintenance activity not found")
@@ -46,6 +47,7 @@ def create_maintenance(
     road_id: int,
     payload: MaintenanceActivityCreate,
     db: DbSession,
+    current_user: EngineerUser,
 ):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
