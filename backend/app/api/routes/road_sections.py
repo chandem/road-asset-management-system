@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, EngineerUser
 from app.db.session import get_db
 from app.models.road import Road
 from app.models.road_section import RoadSection
@@ -15,7 +16,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/roads/{road_id}/sections", response_model=list[RoadSectionResponse])
-def list_sections(road_id: int, db: DbSession):
+def list_sections(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
@@ -27,7 +28,7 @@ def list_sections(road_id: int, db: DbSession):
 
 
 @router.get("/roads/{road_id}/sections/geojson")
-def sections_geojson(road_id: int, db: DbSession):
+def sections_geojson(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
@@ -67,7 +68,7 @@ def sections_geojson(road_id: int, db: DbSession):
 
 
 @router.get("/sections/{section_id}", response_model=RoadSectionResponse)
-def get_section(section_id: int, db: DbSession):
+def get_section(section_id: int, db: DbSession, current_user: AuthenticatedUser):
     section = db.get(RoadSection, section_id)
     if section is None:
         raise HTTPException(status_code=404, detail="Road section not found")
@@ -83,6 +84,7 @@ def create_section(
     road_id: int,
     payload: RoadSectionCreate,
     db: DbSession,
+    current_user: EngineerUser,
 ):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
