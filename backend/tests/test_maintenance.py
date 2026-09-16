@@ -10,6 +10,8 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.routes.maintenance import _validate_dates, _validate_links
+from app.models.road_defect import RoadDefect
+from app.models.road_section import RoadSection
 from app.schemas.maintenance_activity import (
     MaintenanceActivityCreate,
     MaintenanceActivityUpdate,
@@ -24,29 +26,23 @@ class FakeDB:
         return self.objects.get((model, object_id))
 
 
-class Road:
-    pass
-
-
-class RoadSection:
-    pass
-
-
-class RoadDefect:
-    pass
-
-
 def make_section(section_id, road_id):
-    section = RoadSection()
-    section.section_id = section_id
-    section.road_id = road_id
-    return section
+    return RoadSection(
+        section_id=section_id,
+        road_id=road_id,
+        section_code=f"SEC-{section_id}",
+        start_chainage=0,
+        end_chainage=1,
+    )
 
 
 def make_defect(section_id):
-    defect = RoadDefect()
-    defect.section_id = section_id
-    return defect
+    return RoadDefect(
+        defect_id=20,
+        section_id=section_id,
+        defect_type="pothole",
+        detected_by="manual",
+    )
 
 
 def test_validate_dates_accepts_same_or_ordered_dates():
