@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, FieldStaffUser
 from app.db.session import get_db
 from app.models.inspection import Inspection
 from app.models.road_section import RoadSection
@@ -14,7 +15,7 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 @router.get("/roads/{road_id}/inspections", response_model=list[InspectionResponse])
-def list_inspections(road_id: int, db: DbSession):
+def list_inspections(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     return db.scalars(
         select(Inspection)
         .join(RoadSection, RoadSection.section_id == Inspection.section_id)
@@ -24,7 +25,7 @@ def list_inspections(road_id: int, db: DbSession):
 
 
 @router.get("/inspections/{inspection_id}", response_model=InspectionResponse)
-def get_inspection(inspection_id: int, db: DbSession):
+def get_inspection(inspection_id: int, db: DbSession, current_user: AuthenticatedUser):
     inspection = db.get(Inspection, inspection_id)
     if inspection is None:
         raise HTTPException(status_code=404, detail="Inspection not found")
@@ -40,6 +41,7 @@ def create_inspection(
     section_id: int,
     payload: InspectionCreate,
     db: DbSession,
+    current_user: FieldStaffUser,
 ):
     if db.get(RoadSection, section_id) is None:
         raise HTTPException(status_code=404, detail="Road section not found")
