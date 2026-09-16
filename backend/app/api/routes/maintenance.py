@@ -8,6 +8,7 @@ from app.core.security import AuthenticatedUser, EngineerUser
 from app.db.session import get_db
 from app.models.maintenance_activity import MaintenanceActivity
 from app.models.road import Road
+from app.models.road_defect import RoadDefect
 from app.models.road_section import RoadSection
 from app.schemas.maintenance_activity import (
     MaintenanceActivityCreate,
@@ -26,6 +27,22 @@ def list_maintenance(road_id: int, db: DbSession, current_user: AuthenticatedUse
     return db.scalars(
         select(MaintenanceActivity)
         .where(MaintenanceActivity.road_id == road_id)
+        .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)
+    ).all()
+
+
+@router.get("/defects/{defect_id}/maintenance", response_model=list[MaintenanceActivityResponse])
+def list_defect_maintenance(
+    defect_id: int,
+    db: DbSession,
+    current_user: AuthenticatedUser,
+):
+    if db.get(RoadDefect, defect_id) is None:
+        raise HTTPException(status_code=404, detail="Defect not found")
+
+    return db.scalars(
+        select(MaintenanceActivity)
+        .where(MaintenanceActivity.source_defect_id == defect_id)
         .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)
     ).all()
 
@@ -52,10 +69,18 @@ def create_maintenance(
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
+    section = None
     if payload.section_id is not None:
         section = db.get(RoadSection, payload.section_id)
         if section is None or section.road_id != road_id:
             raise HTTPException(status_code=400, detail="Section does not belong to this road")
+
+    if payload.source_defect_id is not None:
+        defect = db.get(RoadDefect, payload.source_defect_id)
+        if defect is None:
+            raise HTTPException(status_code=404, detail="Source defect not found")
+        if section is not None and defect.section_id != section.section_id:
+            raise HTTPException(status_code=400, detail="Source defect does not belong to the selected section")
 
     if (
         payload.planned_date is not None
@@ -67,6 +92,7 @@ def create_maintenance(
     activity = MaintenanceActivity(
         road_id=road_id,
         section_id=payload.section_id,
+        source_defect_id=payload.source_defect_id,
         activity_type=payload.activity_type,
         priority=payload.priority,
         planned_date=payload.planned_date,
