@@ -28,4 +28,8 @@ export function getRoadAssetGeoJSON(roadId) {
   return request(`/roads/${roadId}/assets/geojson`);
 }
 
+export function getDefectGeoJSON() {
+  return request("/defects/geojson");
+}
+
 export { API_BASE };
