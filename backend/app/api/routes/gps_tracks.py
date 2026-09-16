@@ -13,6 +13,40 @@ router = APIRouter(tags=["GPS Tracks"])
 DbSession = Annotated[Session, Depends(get_db)]
 
 
+@router.get("/gps-tracks/geojson")
+def gps_tracks_geojson(db: DbSession):
+    rows = db.execute(
+        select(
+            GPSTrack.track_id,
+            GPSTrack.road_id,
+            GPSTrack.recorded_at,
+            GPSTrack.source,
+            GPSTrack.length_km,
+            func.ST_AsGeoJSON(GPSTrack.geometry),
+        )
+        .where(GPSTrack.geometry.is_not(None))
+        .order_by(GPSTrack.track_id)
+    ).all()
+
+    features = []
+    for track_id, road_id, recorded_at, source, length_km, geometry_json in rows:
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": geometry_json and __import__("json").loads(geometry_json),
+                "properties": {
+                    "track_id": track_id,
+                    "road_id": road_id,
+                    "recorded_at": recorded_at.isoformat() if recorded_at else None,
+                    "source": source,
+                    "length_km": float(length_km) if length_km is not None else None,
+                },
+            }
+        )
+
+    return {"type": "FeatureCollection", "features": features}
+
+
 @router.get("/roads/{road_id}/gps-tracks", response_model=list[GPSTrackResponse])
 def list_gps_tracks(road_id: int, db: DbSession):
     if db.get(Road, road_id) is None:
