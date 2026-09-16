@@ -20,4 +20,12 @@ export function getGPSTrackGeoJSON() {
   return request("/gps-tracks/geojson");
 }
 
+export function getRoadSectionGeoJSON(roadId) {
+  return request(`/roads/${roadId}/sections/geojson`);
+}
+
+export function getRoadAssetGeoJSON(roadId) {
+  return request(`/roads/${roadId}/assets/geojson`);
+}
+
 export { API_BASE };
