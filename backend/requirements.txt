@@ -7,3 +7,5 @@ geoalchemy2
 alembic
 python-multipart
 ultralytics
+python-jose[cryptography]
+passlib[bcrypt]
