@@ -1,0 +1,42 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Node / frontend
+node_modules/
+dist/
+frontend/.vite/
+
+# Runtime uploads and generated files
+uploads/
+backend/uploads/
+*.log
+
+# AI model weights and generated artifacts
+*.pt
+*.onnx
+*.weights
+models/*.pt
+models/*.onnx
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
