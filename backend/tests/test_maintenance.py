@@ -129,6 +129,22 @@ def test_maintenance_create_rejects_negative_costs():
         MaintenanceActivityCreate(activity_type="Pothole repair", actual_cost=-1)
 
 
+def test_maintenance_rejects_invalid_status():
+    with pytest.raises(ValueError):
+        MaintenanceActivityCreate(activity_type="Pothole repair", status="open")
+
+    with pytest.raises(ValueError):
+        MaintenanceActivityUpdate(status="open")
+
+
+def test_maintenance_rejects_invalid_priority():
+    with pytest.raises(ValueError):
+        MaintenanceActivityCreate(activity_type="Pothole repair", priority="urgent")
+
+    with pytest.raises(ValueError):
+        MaintenanceActivityUpdate(priority="urgent")
+
+
 def test_maintenance_update_requires_valid_activity_type_when_supplied():
     with pytest.raises(ValueError):
         MaintenanceActivityUpdate(activity_type="")
