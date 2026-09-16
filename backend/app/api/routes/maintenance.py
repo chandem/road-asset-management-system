@@ -13,6 +13,7 @@ from app.models.road_section import RoadSection
 from app.schemas.maintenance_activity import (
     MaintenanceActivityCreate,
     MaintenanceActivityResponse,
+    MaintenanceActivityUpdate,
 )
 
 router = APIRouter(tags=["Maintenance"])
@@ -55,6 +56,31 @@ def get_maintenance(maintenance_id: int, db: DbSession, current_user: Authentica
     return activity
 
 
+def _validate_links(
+    db: Session,
+    road_id: int,
+    section_id: int | None,
+    source_defect_id: int | None,
+):
+    section = None
+    if section_id is not None:
+        section = db.get(RoadSection, section_id)
+        if section is None or section.road_id != road_id:
+            raise HTTPException(status_code=400, detail="Section does not belong to this road")
+
+    if source_defect_id is not None:
+        defect = db.get(RoadDefect, source_defect_id)
+        if defect is None:
+            raise HTTPException(status_code=404, detail="Source defect not found")
+        if section is not None and defect.section_id != section.section_id:
+            raise HTTPException(status_code=400, detail="Source defect does not belong to the selected section")
+
+
+def _validate_dates(planned_date, completed_date):
+    if planned_date is not None and completed_date is not None and completed_date < planned_date:
+        raise HTTPException(status_code=400, detail="completed_date cannot be before planned_date")
+
+
 @router.post(
     "/roads/{road_id}/maintenance",
     response_model=MaintenanceActivityResponse,
@@ -69,25 +95,8 @@ def create_maintenance(
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
-    section = None
-    if payload.section_id is not None:
-        section = db.get(RoadSection, payload.section_id)
-        if section is None or section.road_id != road_id:
-            raise HTTPException(status_code=400, detail="Section does not belong to this road")
-
-    if payload.source_defect_id is not None:
-        defect = db.get(RoadDefect, payload.source_defect_id)
-        if defect is None:
-            raise HTTPException(status_code=404, detail="Source defect not found")
-        if section is not None and defect.section_id != section.section_id:
-            raise HTTPException(status_code=400, detail="Source defect does not belong to the selected section")
-
-    if (
-        payload.planned_date is not None
-        and payload.completed_date is not None
-        and payload.completed_date < payload.planned_date
-    ):
-        raise HTTPException(status_code=400, detail="completed_date cannot be before planned_date")
+    _validate_links(db, road_id, payload.section_id, payload.source_defect_id)
+    _validate_dates(payload.planned_date, payload.completed_date)
 
     activity = MaintenanceActivity(
         road_id=road_id,
@@ -110,6 +119,46 @@ def create_maintenance(
     except Exception:
         db.rollback()
         raise HTTPException(status_code=400, detail="Could not create maintenance activity")
+
+    db.refresh(activity)
+    return activity
+
+
+@router.patch(
+    "/maintenance/{maintenance_id}",
+    response_model=MaintenanceActivityResponse,
+)
+def update_maintenance(
+    maintenance_id: int,
+    payload: MaintenanceActivityUpdate,
+    db: DbSession,
+    current_user: EngineerUser,
+):
+    activity = db.get(MaintenanceActivity, maintenance_id)
+    if activity is None:
+        raise HTTPException(status_code=404, detail="Maintenance activity not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    section_id = data.get("section_id", activity.section_id)
+    source_defect_id = data.get("source_defect_id", activity.source_defect_id)
+    _validate_links(db, activity.road_id, section_id, source_defect_id)
+
+    planned_date = data.get("planned_date", activity.planned_date)
+    completed_date = data.get("completed_date", activity.completed_date)
+    _validate_dates(planned_date, completed_date)
+
+    for field, value in data.items():
+        setattr(activity, field, value)
+
+    if activity.status == "completed" and activity.completed_date is None:
+        raise HTTPException(status_code=400, detail="completed_date is required when status is completed")
+
+    db.add(activity)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not update maintenance activity")
 
     db.refresh(activity)
     return activity
