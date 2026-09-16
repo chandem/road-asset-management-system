@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getRoadMaintenance, getRoads } from "./api";
+import MaintenanceTrends from "./MaintenanceTrends";
 
 function money(value) {
   return `${(Number(value) || 0).toLocaleString()} ETB`;
@@ -112,6 +113,8 @@ export default function MaintenanceAnalytics() {
           ))}
         </div>
       </div>
+
+      <MaintenanceTrends maintenance={maintenance} />
 
       <div className="report-box">
         <h3>Road-by-Road Maintenance</h3>
