@@ -20,3 +20,4 @@ class User(Base):
     email: Mapped[Optional[str]] = mapped_column(String(255), unique=True)
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="inspector")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255))
