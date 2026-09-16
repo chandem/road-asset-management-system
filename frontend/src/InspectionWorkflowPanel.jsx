@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { createMaintenance, getDefectMaintenance, getInspectionWorkflow } from "./api";
+import {
+  createMaintenance,
+  getDefectMaintenance,
+  getInspectionWorkflow,
+  updateMaintenance,
+} from "./api";
 
 function formatDate(value) {
   if (!value) return "—";
@@ -14,6 +19,18 @@ const emptyMaintenance = {
   description: "",
 };
 
+const emptyEditMaintenance = {
+  activity_type: "",
+  priority: "medium",
+  planned_date: "",
+  estimated_cost: "",
+  actual_cost: "",
+  contractor: "",
+  status: "planned",
+  completed_date: "",
+  description: "",
+};
+
 export default function InspectionWorkflowPanel() {
   const [inspectionId, setInspectionId] = useState("");
   const [workflow, setWorkflow] = useState(null);
@@ -23,6 +40,9 @@ export default function InspectionWorkflowPanel() {
   const [openDefect, setOpenDefect] = useState(null);
   const [maintenanceForm, setMaintenanceForm] = useState(emptyMaintenance);
   const [savingMaintenance, setSavingMaintenance] = useState(false);
+  const [editingMaintenanceId, setEditingMaintenanceId] = useState(null);
+  const [editForm, setEditForm] = useState(emptyEditMaintenance);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
 
   async function loadWorkflow(event) {
@@ -32,6 +52,7 @@ export default function InspectionWorkflowPanel() {
     setError("");
     setMaintenanceByDefect({});
     setOpenDefect(null);
+    setEditingMaintenanceId(null);
     try {
       setWorkflow(await getInspectionWorkflow(Number(inspectionId)));
     } catch (err) {
@@ -53,6 +74,7 @@ export default function InspectionWorkflowPanel() {
 
   function openMaintenanceForm(defect) {
     setOpenDefect(defect.defect_id);
+    setEditingMaintenanceId(null);
     setMaintenanceForm({
       ...emptyMaintenance,
       activity_type: `Repair ${defect.defect_type}`,
@@ -60,6 +82,80 @@ export default function InspectionWorkflowPanel() {
       description: defect.description || "",
     });
     setMaintenanceMessage("");
+  }
+
+  function openEditMaintenance(item) {
+    setEditingMaintenanceId(item.maintenance_id);
+    setOpenDefect(null);
+    setEditForm({
+      activity_type: item.activity_type || "",
+      priority: item.priority || "medium",
+      planned_date: item.planned_date || "",
+      estimated_cost: item.estimated_cost ?? "",
+      actual_cost: item.actual_cost ?? "",
+      contractor: item.contractor || "",
+      status: item.status || "planned",
+      completed_date: item.completed_date || "",
+      description: item.description || "",
+    });
+    setMaintenanceMessage("");
+  }
+
+  function closeEditMaintenance() {
+    setEditingMaintenanceId(null);
+    setEditForm(emptyEditMaintenance);
+  }
+
+  async function saveMaintenanceEdit(event, item, defectId) {
+    event.preventDefault();
+    if (!editForm.activity_type.trim()) {
+      setMaintenanceMessage("Enter a maintenance activity type.");
+      return;
+    }
+    if (editForm.status === "completed" && !editForm.completed_date) {
+      setMaintenanceMessage("A completed date is required when status is completed.");
+      return;
+    }
+    setSavingEdit(true);
+    setMaintenanceMessage("");
+    try {
+      await updateMaintenance(item.maintenance_id, {
+        activity_type: editForm.activity_type.trim(),
+        priority: editForm.priority || null,
+        planned_date: editForm.planned_date || null,
+        estimated_cost: editForm.estimated_cost === "" ? null : Number(editForm.estimated_cost),
+        actual_cost: editForm.actual_cost === "" ? null : Number(editForm.actual_cost),
+        contractor: editForm.contractor.trim() || null,
+        status: editForm.status,
+        completed_date: editForm.completed_date || null,
+        description: editForm.description.trim() || null,
+      });
+      setMaintenanceMessage(`Maintenance #${item.maintenance_id} updated successfully.`);
+      closeEditMaintenance();
+      await loadDefectMaintenance(defectId);
+    } catch (err) {
+      setMaintenanceMessage(`Maintenance update error: ${err.message}`);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function markMaintenanceCompleted(item, defectId) {
+    const today = new Date().toISOString().slice(0, 10);
+    setSavingEdit(true);
+    setMaintenanceMessage("");
+    try {
+      await updateMaintenance(item.maintenance_id, {
+        status: "completed",
+        completed_date: item.completed_date || today,
+      });
+      setMaintenanceMessage(`Maintenance #${item.maintenance_id} marked completed.`);
+      await loadDefectMaintenance(defectId);
+    } catch (err) {
+      setMaintenanceMessage(`Maintenance completion error: ${err.message}`);
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function submitMaintenance(event, defect) {
@@ -152,9 +248,39 @@ export default function InspectionWorkflowPanel() {
                   {maintenanceByDefect[defect.defect_id]?.length > 0 && (
                     <div style={{ marginTop: 8 }}>
                       {maintenanceByDefect[defect.defect_id].map((item) => (
-                        <div key={item.maintenance_id} style={{ padding: "6px 8px", background: "rgba(0,0,0,0.04)", borderRadius: 6, marginTop: 5 }}>
+                        <div key={item.maintenance_id} style={{ padding: "8px", background: "rgba(0,0,0,0.04)", borderRadius: 6, marginTop: 5 }}>
                           <strong>Maintenance #{item.maintenance_id}</strong> · {item.activity_type} · {item.status}
                           <div>Priority: {item.priority || "—"} · Planned: {item.planned_date || "—"}</div>
+                          <div>Estimated: {item.estimated_cost ?? "—"} · Actual: {item.actual_cost ?? "—"} · Contractor: {item.contractor || "—"}</div>
+                          {item.completed_date && <div>Completed: {item.completed_date}</div>}
+                          <div style={{ marginTop: 7, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button type="button" onClick={() => openEditMaintenance(item)}>Edit</button>
+                            {item.status !== "completed" && (
+                              <button type="button" disabled={savingEdit} onClick={() => markMaintenanceCompleted(item, defect.defect_id)}>
+                                {savingEdit ? "Updating…" : "Mark Completed"}
+                              </button>
+                            )}
+                          </div>
+                          {editingMaintenanceId === item.maintenance_id && (
+                            <form onSubmit={(event) => saveMaintenanceEdit(event, item, defect.defect_id)} style={{ marginTop: 10, padding: 10, border: "1px solid #ddd", borderRadius: 8 }}>
+                              <h4>Edit Maintenance #{item.maintenance_id}</h4>
+                              <div className="form-grid">
+                                <label>Activity Type<input value={editForm.activity_type} onChange={(e) => setEditForm((c) => ({ ...c, activity_type: e.target.value }))} required /></label>
+                                <label>Priority<select value={editForm.priority} onChange={(e) => setEditForm((c) => ({ ...c, priority: e.target.value }))}><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label>
+                                <label>Status<select value={editForm.status} onChange={(e) => setEditForm((c) => ({ ...c, status: e.target.value }))}><option>planned</option><option>in_progress</option><option>completed</option><option>cancelled</option></select></label>
+                                <label>Planned Date<input type="date" value={editForm.planned_date} onChange={(e) => setEditForm((c) => ({ ...c, planned_date: e.target.value }))} /></label>
+                                <label>Completed Date<input type="date" value={editForm.completed_date} onChange={(e) => setEditForm((c) => ({ ...c, completed_date: e.target.value }))} /></label>
+                                <label>Estimated Cost<input type="number" min="0" step="0.01" value={editForm.estimated_cost} onChange={(e) => setEditForm((c) => ({ ...c, estimated_cost: e.target.value }))} /></label>
+                                <label>Actual Cost<input type="number" min="0" step="0.01" value={editForm.actual_cost} onChange={(e) => setEditForm((c) => ({ ...c, actual_cost: e.target.value }))} /></label>
+                                <label>Contractor<input value={editForm.contractor} onChange={(e) => setEditForm((c) => ({ ...c, contractor: e.target.value }))} /></label>
+                                <label>Description<textarea value={editForm.description} onChange={(e) => setEditForm((c) => ({ ...c, description: e.target.value }))} /></label>
+                              </div>
+                              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                                <button type="submit" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save Changes"}</button>
+                                <button type="button" onClick={closeEditMaintenance}>Cancel</button>
+                              </div>
+                            </form>
+                          )}
                         </div>
                       ))}
                     </div>
