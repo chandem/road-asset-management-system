@@ -1,5 +1,7 @@
 # Road Asset Management System (RAMS)
 
+[![RAMS CI](https://github.com/chandem/road-asset-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/chandem/road-asset-management-system/actions/workflows/ci.yml)
+
 A road asset management platform for collecting, organizing, assessing, and managing road infrastructure data.
 
 ## Purpose
