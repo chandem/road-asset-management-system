@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.security import AuthenticatedUser, FieldStaffUser
 from app.db.session import get_db
 from app.models.image import Image
 from app.models.inspection import Inspection
@@ -21,12 +22,12 @@ MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 @router.get("/images", response_model=list[ImageResponse])
-def list_images(db: DbSession):
+def list_images(db: DbSession, current_user: AuthenticatedUser):
     return db.scalars(select(Image).order_by(Image.image_id.desc())).all()
 
 
 @router.get("/images/{image_id}", response_model=ImageResponse)
-def get_image(image_id: int, db: DbSession):
+def get_image(image_id: int, db: DbSession, current_user: AuthenticatedUser):
     image = db.get(Image, image_id)
     if image is None:
         raise HTTPException(status_code=404, detail="Image not found")
@@ -36,6 +37,7 @@ def get_image(image_id: int, db: DbSession):
 @router.post("/images/upload", response_model=ImageResponse, status_code=201)
 async def upload_image(
     db: DbSession,
+    current_user: FieldStaffUser,
     file: UploadFile = File(...),
     inspection_id: int | None = Form(default=None),
     defect_id: int | None = Form(default=None),
