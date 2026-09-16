@@ -18,6 +18,20 @@ class MaintenanceActivityCreate(BaseModel):
     description: Optional[str] = None
 
 
+class MaintenanceActivityUpdate(BaseModel):
+    section_id: Optional[int] = None
+    source_defect_id: Optional[int] = None
+    activity_type: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    priority: Optional[str] = Field(default=None, max_length=30)
+    planned_date: Optional[date] = None
+    completed_date: Optional[date] = None
+    estimated_cost: Optional[float] = Field(default=None, ge=0)
+    actual_cost: Optional[float] = Field(default=None, ge=0)
+    contractor: Optional[str] = Field(default=None, max_length=200)
+    status: Optional[str] = Field(default=None, max_length=30)
+    description: Optional[str] = None
+
+
 class MaintenanceActivityResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
