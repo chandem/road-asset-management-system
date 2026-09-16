@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import App from "./App";
+import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
 import { API_BASE } from "./api";
 import { clearToken, getToken, setToken } from "./auth";
 
@@ -79,6 +80,7 @@ export default function AuthGate() {
         <button type="button" onClick={logout}>Logout</button>
       </div>
       <App />
+      <InspectionWorkflowPanel />
     </>
   );
 }
