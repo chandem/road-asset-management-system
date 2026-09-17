@@ -107,14 +107,14 @@ CREATE TABLE culverts (
     chainage_km NUMERIC(12,3),
     condition_rating NUMERIC(5,2),
     geometry geometry(Point, 4326),
-    description TEXT,
-    CHECK (condition_rating IS NULL OR (condition_rating >= 0 AND condition_rating <= 100))
+    description TEXT
 );
 
 CREATE TABLE inspections (
     inspection_id BIGSERIAL PRIMARY KEY,
     section_id BIGINT NOT NULL REFERENCES road_sections(section_id) ON DELETE CASCADE,
     inspector_id BIGINT REFERENCES users(user_id) ON DELETE SET NULL,
+    client_id VARCHAR(100) UNIQUE,
     inspection_date DATE NOT NULL,
     condition_rating NUMERIC(5,2),
     weather VARCHAR(100),
