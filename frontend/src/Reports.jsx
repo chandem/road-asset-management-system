@@ -64,13 +64,41 @@ export default function Reports() {
     URL.revokeObjectURL(url);
   }
 
+  async function exportExcel() {
+    try {
+      const params = new URLSearchParams();
+      if (roadId) params.set("road_id", roadId);
+      if (year) params.set("plan_year", year);
+      const response = await fetch(`${API_BASE}/reports/export.xlsx?${params}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Excel export failed");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "rams-reports.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message || "Excel export failed");
+    }
+  }
+
   return <section className="panel">
     <h2>Reports & Export</h2>
     <div className="form-grid">
       <label>Road<select value={roadId} onChange={(e) => setRoadId(e.target.value)}><option value="">All roads</option>{roads.map((road) => <option key={road.road_id} value={road.road_id}>{road.road_code} — {road.road_name}</option>)}</select></label>
       <label>Plan year<select value={year} onChange={(e) => setYear(e.target.value)}><option value="">All years</option>{plans.map((plan) => <option key={plan.plan_id} value={plan.plan_year}>{plan.plan_year} — {plan.name}</option>)}</select></label>
     </div>
-    <div className="button-row"><button type="button" onClick={loadReports} disabled={loading}>{loading ? "Loading…" : "Generate reports"}</button><button type="button" onClick={exportMaintenanceCsv}>Export maintenance CSV</button></div>
+    <div className="button-row">
+      <button type="button" onClick={loadReports} disabled={loading}>{loading ? "Loading…" : "Generate reports"}</button>
+      <button type="button" onClick={exportMaintenanceCsv}>Export maintenance CSV</button>
+      <button type="button" onClick={exportExcel}>Export Excel</button>
+    </div>
     {error && <div className="auth-error">{error}</div>}
 
     {maintenance && <div className="report-block"><h3>Maintenance report</h3><div className="stats-grid"><div><strong>{maintenance.summary.activity_count}</strong><span>Activities</span></div><div><strong>{maintenance.summary.completed_count}</strong><span>Completed</span></div><div><strong>{money(maintenance.summary.estimated_cost)}</strong><span>Estimated cost</span></div><div><strong>{money(maintenance.summary.actual_cost)}</strong><span>Actual cost</span></div></div><div className="table-wrap"><table><thead><tr><th>Road</th><th>Activity</th><th>Priority</th><th>Planned</th><th>Status</th><th>Estimated</th><th>Actual</th></tr></thead><tbody>{maintenance.items.map((item) => <tr key={item.maintenance_id}><td>{item.road_code}</td><td>{item.activity_type}</td><td>{item.priority || "—"}</td><td>{item.planned_date || "—"}</td><td>{item.status}</td><td>{money(item.estimated_cost)}</td><td>{money(item.actual_cost)}</td></tr>)}</tbody></table></div></div>}
