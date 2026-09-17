@@ -48,15 +48,19 @@ cd road-asset-management-system
 docker compose up --build
 ```
 
-Once running:
+Once running (via the nginx proxy):
 
 | Service | URL |
 |---------|-----|
-| Frontend | http://localhost:5173 |
-| Backend API docs | http://localhost:8000/docs |
-| Health check | http://localhost:8000/health |
+| App (frontend) | http://localhost |
+| Backend API docs | http://localhost/api/v1/docs (or direct backend if exposed) |
+| Health | http://localhost/health |
+
+Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD` and `JWT_SECRET_KEY` before the first `docker compose up`.
 
 On first start the DB loads `database/schema.sql`. The backend then runs `alembic upgrade head` so future schema changes are versioned.
+
+Local Vite-only frontend (manual Option B) still uses `http://localhost:5173` with the API on `http://localhost:8000`.
 
 To stop:
 
