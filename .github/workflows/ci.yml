@@ -13,6 +13,7 @@ jobs:
     env:
       JWT_SECRET_KEY: test-secret-key-for-rams-ci-32-chars-minimum
       ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      DATABASE_URL: postgresql+psycopg://rams_user:ci_password@localhost:5432/rams
       PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/backend
     steps:
       - name: Checkout
