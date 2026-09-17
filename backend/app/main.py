@@ -24,8 +24,11 @@ from app.api.routes.roads import router as roads_router
 from app.api.routes.users import router as users_router
 from app.api.routes.work_orders import router as work_orders_router
 from app.core.config import settings
+from app.core.errors import register_exception_handlers
 
 app = FastAPI(title=f"{settings.app_name} API", version="0.9.0", debug=settings.debug)
+
+register_exception_handlers(app)
 
 app.add_middleware(
     TrustedHostMiddleware,
@@ -48,7 +51,9 @@ async def security_headers(request: Request, call_next) -> Response:
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=()")
     if request.url.scheme == "https":
-        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
     return response
 
 
