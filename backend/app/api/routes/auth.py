@@ -17,7 +17,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1)
-    password: str = Field(min_length=1)
+    password: str = Field(min_length=1, max_length=72)
 
 
 class LoginResponse(BaseModel):
@@ -31,7 +31,7 @@ class LoginResponse(BaseModel):
 
 class PasswordSetupRequest(BaseModel):
     user_id: int
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=8, max_length=72)
 
 
 @router.post("/auth/login", response_model=LoginResponse)
@@ -57,11 +57,19 @@ def me(token: Annotated[str, Depends(oauth2_scheme)], db: DbSession):
         payload = decode_access_token(token)
         user_id = int(payload["sub"])
     except (ValueError, KeyError, TypeError):
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     user = db.get(User, user_id)
     if user is None or not user.is_active:
-        raise HTTPException(status_code=401, detail="User is not active")
+        raise HTTPException(
+            status_code=401,
+            detail="User is not active",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     return LoginResponse(
         access_token=token,
