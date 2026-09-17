@@ -36,6 +36,7 @@ export function getRoadInspections(roadId) { return request(`/roads/${roadId}/in
 export function getInspection(inspectionId) { return request(`/inspections/${inspectionId}`); }
 export function getInspectionWorkflow(inspectionId) { return request(`/inspections/${inspectionId}/workflow`); }
 export function getRoadMaintenance(roadId) { return request(`/roads/${roadId}/maintenance`); }
+export function getRoadMaintenanceGeoJSON(roadId) { return request(`/roads/${roadId}/maintenance/geojson`); }
 export function getMaintenance(maintenanceId) { return request(`/maintenance/${maintenanceId}`); }
 export function getMaintenanceHistory(maintenanceId) { return request(`/maintenance/${maintenanceId}/history`); }
 export function getDefectMaintenance(defectId) { return request(`/defects/${defectId}/maintenance`); }
