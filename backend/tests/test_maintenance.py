@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import date, datetime, timezone
 
 os.environ.setdefault(
     "JWT_SECRET_KEY",
@@ -9,7 +9,14 @@ os.environ.setdefault(
 import pytest
 from fastapi import HTTPException
 
-from app.api.routes.maintenance import _validate_dates, _validate_links
+from app.api.routes.maintenance import (
+    _activity_values,
+    _add_history,
+    _validate_dates,
+    _validate_links,
+)
+from app.models.maintenance_activity import MaintenanceActivity
+from app.models.maintenance_history import MaintenanceHistory
 from app.models.road_defect import RoadDefect
 from app.models.road_section import RoadSection
 from app.schemas.maintenance_activity import (
@@ -19,11 +26,15 @@ from app.schemas.maintenance_activity import (
 
 
 class FakeDB:
-    def __init__(self, objects):
-        self.objects = objects
+    def __init__(self, objects=None):
+        self.objects = objects or {}
+        self.added = []
 
     def get(self, model, object_id):
         return self.objects.get((model, object_id))
+
+    def add(self, obj):
+        self.added.append(obj)
 
 
 def make_section(section_id, road_id):
@@ -43,6 +54,26 @@ def make_defect(section_id):
         defect_type="pothole",
         detected_by="manual",
     )
+
+
+def make_activity(**overrides):
+    values = {
+        "maintenance_id": 50,
+        "road_id": 1,
+        "section_id": 10,
+        "source_defect_id": 20,
+        "activity_type": "Pothole repair",
+        "priority": "high",
+        "planned_date": date(2026, 9, 10),
+        "completed_date": None,
+        "estimated_cost": 1000,
+        "actual_cost": None,
+        "contractor": "RAMS Contractor",
+        "status": "planned",
+        "description": "Repair pothole",
+    }
+    values.update(overrides)
+    return MaintenanceActivity(**values)
 
 
 def test_validate_dates_accepts_same_or_ordered_dates():
@@ -167,3 +198,87 @@ def test_maintenance_create_accepts_completed_activity_with_date():
     assert activity.completed_date == date(2026, 9, 12)
     assert activity.estimated_cost == 1000
     assert activity.actual_cost == 950
+
+
+def test_activity_values_serializes_dates_and_keeps_audit_fields():
+    activity = make_activity(completed_date=date(2026, 9, 12))
+
+    values = _activity_values(activity)
+
+    assert values["maintenance_id"] if "maintenance_id" in values else True
+    assert values["road_id"] == 1
+    assert values["section_id"] == 10
+    assert values["source_defect_id"] == 20
+    assert values["planned_date"] == "2026-09-10"
+    assert values["completed_date"] == "2026-09-12"
+    assert values["estimated_cost"] == 1000
+    assert values["status"] == "planned"
+
+
+def test_add_history_records_created_action_and_snapshots():
+    activity = make_activity()
+    db = FakeDB()
+    created_at = datetime.now(timezone.utc)
+
+    _add_history(
+        db,
+        activity,
+        changed_by=7,
+        action="created",
+        new_values=_activity_values(activity),
+    )
+
+    assert len(db.added) == 1
+    history = db.added[0]
+    assert isinstance(history, MaintenanceHistory)
+    assert history.maintenance_id == 50
+    assert history.changed_by == 7
+    assert history.action == "created"
+    assert history.old_values is None
+    assert history.new_values["activity_type"] == "Pothole repair"
+    assert history.new_values["planned_date"] == "2026-09-10"
+    assert history.changed_at is not None
+    assert history.changed_at >= created_at
+
+
+def test_add_history_records_updated_action_with_old_and_new_values():
+    activity = make_activity()
+    db = FakeDB()
+    old_values = _activity_values(activity)
+    new_values = dict(old_values)
+    new_values["status"] = "in progress"
+
+    _add_history(
+        db,
+        activity,
+        changed_by=8,
+        action="updated",
+        old_values=old_values,
+        new_values={"status": {"old": "planned", "new": "in progress"}},
+    )
+
+    history = db.added[0]
+    assert history.action == "updated"
+    assert history.changed_by == 8
+    assert history.old_values["status"] == "planned"
+    assert history.new_values["status"] == {"old": "planned", "new": "in progress"}
+
+
+@pytest.mark.parametrize("action", ["completed", "cancelled"])
+def test_add_history_supports_status_transition_actions(action):
+    activity = make_activity(status=action)
+    db = FakeDB()
+
+    _add_history(
+        db,
+        activity,
+        changed_by=9,
+        action=action,
+        old_values={"status": "in progress"},
+        new_values={"status": action},
+    )
+
+    history = db.added[0]
+    assert history.action == action
+    assert history.old_values == {"status": "in progress"}
+    assert history.new_values == {"status": action}
