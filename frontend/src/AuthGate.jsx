@@ -3,7 +3,8 @@ import App from "./App";
 import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
 import MaintenanceAnalytics from "./MaintenanceAnalytics";
 import MaintenanceHistoryPanel from "./MaintenanceHistoryPanel";
-import { API_BASE } from "./api";
+import OfflineInspectionQueue from "./OfflineInspectionQueue";
+import { API_BASE, getRoadSections, getRoads } from "./api";
 import { clearToken, getToken, setToken } from "./auth";
 
 export default function AuthGate() {
@@ -13,6 +14,7 @@ export default function AuthGate() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
+  const [offlineSections, setOfflineSections] = useState([]);
 
   useEffect(() => {
     const token = getToken();
@@ -29,6 +31,19 @@ export default function AuthGate() {
       .catch(() => clearToken())
       .finally(() => setChecking(false));
   }, []);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    let active = true;
+    Promise.all([getRoads(), getRoads().then((roads) => Promise.all(roads.map((road) => getRoadSections(road.road_id))))])
+      .then(([, sectionGroups]) => {
+        if (active) setOfflineSections(sectionGroups.flat());
+      })
+      .catch(() => {
+        if (active) setOfflineSections([]);
+      });
+    return () => { active = false; };
+  }, [user]);
 
   async function handleLogin(event) {
     event.preventDefault();
@@ -85,6 +100,7 @@ export default function AuthGate() {
       <InspectionWorkflowPanel />
       <MaintenanceAnalytics />
       <MaintenanceHistoryPanel />
+      <OfflineInspectionQueue sections={offlineSections} />
     </>
   );
 }
