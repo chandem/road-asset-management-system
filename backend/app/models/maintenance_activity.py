@@ -26,6 +26,7 @@ class MaintenanceActivity(Base):
     )
     activity_type: Mapped[str] = mapped_column(String(100), nullable=False)
     priority: Mapped[Optional[str]] = mapped_column(String(30))
+    chainage_km: Mapped[Optional[float]] = mapped_column(Numeric(12, 3))
     planned_date: Mapped[Optional[date]] = mapped_column(Date)
     completed_date: Mapped[Optional[date]] = mapped_column(Date)
     estimated_cost: Mapped[Optional[float]] = mapped_column(Numeric(14, 2))
