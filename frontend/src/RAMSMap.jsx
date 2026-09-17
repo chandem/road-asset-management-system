@@ -42,8 +42,26 @@ function popupHandlers() {
   return (feature, layer) => layer.bindPopup(popupContent(feature?.properties));
 }
 
-function featureStyle(weight, dashArray) {
-  return { weight, dashArray, opacity: 0.9 };
+function conditionCategory(score) {
+  if (!Number.isFinite(score)) return "Not rated";
+  if (score >= 85) return "Excellent";
+  if (score >= 70) return "Good";
+  if (score >= 50) return "Fair";
+  if (score >= 30) return "Poor";
+  return "Critical";
+}
+
+function conditionPriority(score, critical, high) {
+  if (score < 30 || critical > 0) return "critical";
+  if (score < 50 || high >= 2) return "high";
+  if (score < 70 || high === 1) return "medium";
+  return "low";
+}
+
+function sectionStyle(feature) {
+  const score = Number(feature?.properties?.condition_rating);
+  const weight = Number.isFinite(score) ? (score < 30 ? 7 : score < 50 ? 6 : score < 70 ? 5 : 4) : 4;
+  return { weight, dashArray: "4 4", opacity: 0.9 };
 }
 
 function pointStyle(radius) {
@@ -152,12 +170,43 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     name: feature?.properties?.road_name || feature?.properties?.road_code || `Road ${feature?.properties?.road_id}`,
   })).filter((x) => x.id);
 
+  const sectionPopupHandlers = useMemo(() => (feature, layer) => {
+    const sectionId = Number(feature?.properties?.section_id);
+    const score = Number(feature?.properties?.condition_rating);
+    const defects = (filtered.defectGeoJSON?.features || []).filter(
+      (item) => Number(item?.properties?.section_id) === sectionId,
+    );
+    const maintenance = (filtered.maintenanceGeoJSON?.features || []).filter(
+      (item) => Number(item?.properties?.section_id) === sectionId,
+    );
+    const critical = defects.filter((item) => String(item?.properties?.severity || "").toLowerCase() === "critical").length;
+    const high = defects.filter((item) => String(item?.properties?.severity || "").toLowerCase() === "high").length;
+    const priority = conditionPriority(Number.isFinite(score) ? score : 100, critical, high);
+    const estimated = maintenance.reduce((sum, item) => sum + (Number(item?.properties?.estimated_cost) || 0), 0);
+    const actual = maintenance.reduce((sum, item) => sum + (Number(item?.properties?.actual_cost) || 0), 0);
+    const content = `
+      <div class="rams-popup">
+        <strong>${escapeHtml(feature?.properties?.section_code || `Section ${sectionId}`)}</strong>
+        <table>
+          <tr><td><strong>Condition</strong></td><td>${Number.isFinite(score) ? score.toFixed(1) : "Not rated"}</td></tr>
+          <tr><td><strong>Category</strong></td><td>${conditionCategory(score)}</td></tr>
+          <tr><td><strong>Maintenance priority</strong></td><td>${priority}</td></tr>
+          <tr><td><strong>Defects</strong></td><td>${defects.length} (${critical} critical, ${high} high)</td></tr>
+          <tr><td><strong>Maintenance activities</strong></td><td>${maintenance.length}</td></tr>
+          <tr><td><strong>Estimated cost</strong></td><td>${estimated.toLocaleString()}</td></tr>
+          <tr><td><strong>Actual cost</strong></td><td>${actual.toLocaleString()}</td></tr>
+        </table>
+        <small>Decision support is based on recorded condition, defects and maintenance records.</small>
+      </div>`;
+    layer.bindPopup(content);
+  }, [filtered.defectGeoJSON, filtered.maintenanceGeoJSON]);
+
   return (
     <section className="map-panel">
       <div className="panel-heading">
         <div>
-          <h2>GIS Road Asset & Defect Map</h2>
-          <p>{loading || spatialLoading ? "Loading spatial data…" : "Click a feature for RAMS attributes. Filter the road and toggle layers as needed."}</p>
+          <h2>GIS Road Asset & Decision Support Map</h2>
+          <p>{loading || spatialLoading ? "Loading spatial data…" : "Click a road section to review condition, defects, maintenance priority and recorded costs."}</p>
         </div>
         <div className="layer-controls" aria-label="Map filters and layers">
           <label>
@@ -179,7 +228,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
         <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         {visible.roads && filtered.roadGeoJSON && <GeoJSON data={filtered.roadGeoJSON} style={featureStyle(5)} onEachFeature={popupHandlers()} />}
         {visible.gps && filtered.gpsGeoJSON && <GeoJSON data={filtered.gpsGeoJSON} style={featureStyle(3, "8 6")} onEachFeature={popupHandlers()} />}
-        {visible.sections && filtered.sectionGeoJSON && <GeoJSON data={filtered.sectionGeoJSON} style={featureStyle(4, "4 4")} onEachFeature={popupHandlers()} />}
+        {visible.sections && filtered.sectionGeoJSON && <GeoJSON data={filtered.sectionGeoJSON} style={sectionStyle} onEachFeature={sectionPopupHandlers} />}
         {visible.assets && filtered.assetGeoJSON && <GeoJSON data={filtered.assetGeoJSON} pointToLayer={pointStyle(7)} onEachFeature={popupHandlers()} />}
         {visible.defects && filtered.defectGeoJSON && <GeoJSON data={filtered.defectGeoJSON} pointToLayer={pointStyle(8)} onEachFeature={popupHandlers()} />}
         {(visible.chainage ?? true) && filtered.chainageGeoJSON && <GeoJSON data={filtered.chainageGeoJSON} pointToLayer={chainageStyle} onEachFeature={popupHandlers()} />}
