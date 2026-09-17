@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import {
-  createDefect, createInspection, createMaintenance, getAIDetections, getAIStatus, getDashboardSummary, getDefectGeoJSON, getGPSTrackGeoJSON,
+  createDefect, createInspection, createMaintenance, getAIDetections, getAIStatus, getDashboardSummary, getDashboardAttention, getDefectGeoJSON, getGPSTrackGeoJSON,
   getRoadAssetGeoJSON, getRoadGeoJSON, getRoadMaintenance, getRoadSectionGeoJSON,
   runAIDetection, uploadImage,
 } from "./api";
@@ -12,6 +12,7 @@ import OfflinePhotoQueue from "./OfflinePhotoQueue";
 import RAMSMap from "./RAMSMap";
 import SummaryCards from "./components/SummaryCards";
 import ReportPanel from "./components/ReportPanel";
+import AttentionPanel from "./components/AttentionPanel";
 import MaintenanceSection from "./components/MaintenanceSection";
 import PhotoAIPanel from "./components/PhotoAIPanel";
 import InspectionDefectForm from "./components/InspectionDefectForm";
@@ -38,6 +39,7 @@ function App({ user }) {
   const [aiMessage, setAiMessage] = useState("");
   const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
   const [summaryCounts, setSummaryCounts] = useState(null);
+  const [attention, setAttention] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [maintenanceRoadId, setMaintenanceRoadId] = useState(""); const [maintenance, setMaintenance] = useState([]);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
@@ -68,6 +70,11 @@ function App({ user }) {
       setGpsGeoJSON(gg);
       setDefectGeoJSON(dg);
       setSummaryCounts(summary.counts || null);
+      try {
+        setAttention(await getDashboardAttention());
+      } catch (_) {
+        setAttention(null);
+      }
 
       setSectionGeoJSON({ type: "FeatureCollection", features: [] });
       setAssetGeoJSON({ type: "FeatureCollection", features: [] });
@@ -340,6 +347,7 @@ function App({ user }) {
         {activeTab === "overview" && (
           <>
             <SummaryCards loading={loading} counts={summaryCounts} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} />
+            <AttentionPanel attention={attention} loading={loading} onNavigate={setActiveTab} />
             <ReportPanel report={report} onRefresh={loadDashboard} />
             <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
           </>
