@@ -128,7 +128,6 @@ With the backend running and database configured:
 
 ```bash
 cd backend
-# Make sure PYTHONPATH includes the backend directory and env vars are set
 export PYTHONPATH=.
 export DATABASE_URL=postgresql+psycopg://rams_user:change_me@localhost:5432/rams
 export JWT_SECRET_KEY=your-secret-at-least-32-characters-long
@@ -143,6 +142,35 @@ With Docker:
 ```bash
 docker compose exec backend python scripts/create_admin.py --username admin --full-name "Admin User"
 ```
+
+### Seed demo data
+
+Load sample users, roads, sections, an inspection, defect, and maintenance activity:
+
+```bash
+cd backend
+export PYTHONPATH=.
+export DATABASE_URL=postgresql+psycopg://rams_user:change_me@localhost:5432/rams
+export JWT_SECRET_KEY=your-secret-at-least-32-characters-long
+
+python scripts/seed_demo_data.py
+```
+
+Docker:
+
+```bash
+docker compose exec backend python scripts/seed_demo_data.py
+```
+
+Demo accounts (password **`DemoPass123!`**):
+
+| Username | Role |
+|----------|------|
+| admin | admin |
+| engineer | engineer |
+| inspector | inspector |
+
+The script is idempotent — safe to run more than once.
 
 ### Environment variables
 
@@ -170,7 +198,7 @@ Key variables:
 │   │   ├── models/   # SQLAlchemy models
 │   │   ├── schemas/  # Pydantic schemas
 │   │   └── services/ # Business logic (e.g. AI detection)
-│   ├── scripts/      # create_admin.py, etc.
+│   ├── scripts/      # create_admin.py, seed_demo_data.py
 │   └── tests/
 ├── frontend/         # React + Vite UI
 ├── database/         # schema.sql + legacy SQL migrations
