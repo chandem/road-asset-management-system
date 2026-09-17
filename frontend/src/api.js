@@ -46,6 +46,7 @@ export function getMaintenancePlans() { return request("/maintenance-plans"); }
 export function getMaintenancePlan(planId) { return request(`/maintenance-plans/${planId}`); }
 export function getMaintenancePlanActivities(planId) { return request(`/maintenance-plans/${planId}/activities`); }
 export function getMaintenancePlanSummary(planId) { return request(`/maintenance-plans/${planId}/summary`); }
+export function getMaintenancePlanOptimization(planId) { return request(`/maintenance-plans/${planId}/optimization`); }
 export function createMaintenancePlan(payload) { return request("/maintenance-plans", { method: "POST", body: JSON.stringify(payload) }); }
 export function updateMaintenancePlan(planId, payload) { return request(`/maintenance-plans/${planId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
 export function updateMaintenancePlanStatus(planId, status) { return request(`/maintenance-plans/${planId}/status?status=${encodeURIComponent(status)}`, { method: "PATCH" }); }
