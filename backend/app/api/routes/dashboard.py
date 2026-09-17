@@ -1,5 +1,6 @@
-"""Aggregated dashboard metrics for the Overview screen."""
+"""Aggregated dashboard metrics and attention items for Overview."""
 
+from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
@@ -11,6 +12,7 @@ from app.db.session import get_db
 from app.models.gps_track import GPSTrack
 from app.models.inspection import Inspection
 from app.models.maintenance_activity import MaintenanceActivity
+from app.models.maintenance_plan import MaintenancePlan
 from app.models.road import Road
 from app.models.road_asset import RoadAsset
 from app.models.road_defect import RoadDefect
@@ -19,6 +21,10 @@ from app.models.work_order import WorkOrder
 
 router = APIRouter(tags=["Dashboard"])
 DbSession = Annotated[Session, Depends(get_db)]
+
+HIGH_SEVERITY = ("high", "critical", "severe", "very high")
+OPEN_MAINT_STATUSES = ("planned", "approved", "in_progress", "scheduled")
+CLOSED_WO = ("completed", "cancelled", "closed", "done")
 
 
 def _count(db: Session, model) -> int:
@@ -67,3 +73,119 @@ def dashboard_summary(db: DbSession, current_user: AuthenticatedUser) -> dict[st
     ]
 
     return {"counts": counts, "roads": roads, "sections": sections}
+
+
+@router.get("/dashboard/attention")
+def dashboard_attention(db: DbSession, current_user: AuthenticatedUser) -> dict[str, Any]:
+    """Items that need action: overdue work orders, high-severity defects, overdue maintenance, over-budget plans."""
+    today = date.today()
+
+    overdue_orders = []
+    for wo in db.scalars(
+        select(WorkOrder)
+        .where(WorkOrder.due_date.is_not(None))
+        .where(WorkOrder.due_date < today)
+        .where(WorkOrder.status.notin_(CLOSED_WO))
+        .order_by(WorkOrder.due_date.asc())
+        .limit(25)
+    ).all():
+        overdue_orders.append(
+            {
+                "work_order_id": wo.work_order_id,
+                "order_number": wo.order_number,
+                "due_date": wo.due_date.isoformat() if wo.due_date else None,
+                "status": wo.status,
+                "assigned_to": wo.assigned_to,
+                "maintenance_id": wo.maintenance_id,
+            }
+        )
+
+    high_defects = []
+    for d in db.scalars(
+        select(RoadDefect)
+        .where(func.lower(RoadDefect.severity).in_(HIGH_SEVERITY))
+        .order_by(RoadDefect.defect_id.desc())
+        .limit(25)
+    ).all():
+        high_defects.append(
+            {
+                "defect_id": d.defect_id,
+                "defect_type": d.defect_type,
+                "severity": d.severity,
+                "section_id": d.section_id,
+                "chainage_km": float(d.chainage_km) if d.chainage_km is not None else None,
+                "description": d.description,
+            }
+        )
+
+    overdue_maintenance = []
+    for m in db.scalars(
+        select(MaintenanceActivity)
+        .where(MaintenanceActivity.planned_date.is_not(None))
+        .where(MaintenanceActivity.planned_date < today)
+        .where(MaintenanceActivity.status.in_(OPEN_MAINT_STATUSES))
+        .order_by(MaintenanceActivity.planned_date.asc())
+        .limit(25)
+    ).all():
+        overdue_maintenance.append(
+            {
+                "maintenance_id": m.maintenance_id,
+                "activity_type": m.activity_type,
+                "priority": m.priority,
+                "status": m.status,
+                "planned_date": m.planned_date.isoformat() if m.planned_date else None,
+                "road_id": m.road_id,
+                "section_id": m.section_id,
+            }
+        )
+
+    over_budget_plans = []
+    plans = db.scalars(
+        select(MaintenancePlan)
+        .where(MaintenancePlan.budget.is_not(None))
+        .where(MaintenancePlan.status.notin_(("cancelled", "archived")))
+        .order_by(MaintenancePlan.plan_year.desc())
+        .limit(50)
+    ).all()
+    for plan in plans:
+        spent = db.scalar(
+            select(
+                func.coalesce(
+                    func.sum(
+                        func.coalesce(
+                            MaintenanceActivity.actual_cost,
+                            MaintenanceActivity.estimated_cost,
+                        )
+                    ),
+                    0,
+                )
+            ).where(MaintenanceActivity.plan_id == plan.plan_id)
+        )
+        spent_f = float(spent or 0)
+        budget_f = float(plan.budget or 0)
+        if budget_f > 0 and spent_f > budget_f:
+            over_budget_plans.append(
+                {
+                    "plan_id": plan.plan_id,
+                    "name": plan.name,
+                    "plan_year": plan.plan_year,
+                    "budget": budget_f,
+                    "spent": spent_f,
+                    "over_by": round(spent_f - budget_f, 2),
+                    "status": plan.status,
+                }
+            )
+
+    return {
+        "as_of": today.isoformat(),
+        "overdue_work_orders": overdue_orders,
+        "high_severity_defects": high_defects,
+        "overdue_maintenance": overdue_maintenance,
+        "over_budget_plans": over_budget_plans,
+        "totals": {
+            "overdue_work_orders": len(overdue_orders),
+            "high_severity_defects": len(high_defects),
+            "overdue_maintenance": len(overdue_maintenance),
+            "over_budget_plans": len(over_budget_plans),
+        },
+    }
