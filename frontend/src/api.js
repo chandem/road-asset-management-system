@@ -41,6 +41,8 @@ export function getMaintenanceHistory(maintenanceId) { return request(`/maintena
 export function getDefectMaintenance(defectId) { return request(`/defects/${defectId}/maintenance`); }
 export function createMaintenance(roadId, payload) { return request(`/roads/${roadId}/maintenance`, { method: "POST", body: JSON.stringify(payload) }); }
 export function updateMaintenance(maintenanceId, payload) { return request(`/maintenance/${maintenanceId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
+export function getRoadMaintenanceEffectiveness(roadId) { return request(`/roads/${roadId}/maintenance-effectiveness`); }
+export function getMaintenanceEffectiveness(maintenanceId) { return request(`/maintenance/${maintenanceId}/effectiveness`); }
 
 export function getMaintenancePlans() { return request("/maintenance-plans"); }
 export function getMaintenancePlan(planId) { return request(`/maintenance-plans/${planId}`); }
