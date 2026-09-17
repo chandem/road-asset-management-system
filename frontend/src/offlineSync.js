@@ -1,15 +1,16 @@
 import { createDefect, createInspection, uploadImage } from "./api";
 import {
+  deletePhoto,
   getDefectMapping,
+  getInspectionMapping,
+  getInspections,
   getPendingDefects,
   getPendingInspections,
-  getInspections,
   getPhotos,
-  putDefectMapping,
-  putInspectionMapping,
-  deletePhoto,
-  putInspection,
   putDefect,
+  putDefectMapping,
+  putInspection,
+  putInspectionMapping,
 } from "./offlineDb";
 
 const LEGACY_INSPECTION_QUEUE_KEY = "rams.offline.inspection.queue";
@@ -100,15 +101,11 @@ export async function syncOfflineQueues() {
     let syncedDefects = 0;
     for (const item of defects) {
       const inspectionId = item.inspection_client_id
-        ? await getInspections().then((items) => items.find((x) => x.client_id === item.inspection_client_id)?.inspection_id ?? null)
+        ? await getInspectionMapping(item.inspection_client_id)
         : item.inspection_id;
-      const resolvedInspectionId = item.inspection_client_id
-        ? (await import("./offlineDb")).getInspectionMapping(item.inspection_client_id)
-        : Promise.resolve(inspectionId);
-      const parentInspectionId = await resolvedInspectionId;
-      if (!parentInspectionId) continue;
+      if (!inspectionId) continue;
       try {
-        const result = await createDefect(parentInspectionId, {
+        const result = await createDefect(inspectionId, {
           section_id: item.section_id ?? null,
           client_id: item.client_id,
           defect_type: item.defect_type,
@@ -131,7 +128,7 @@ export async function syncOfflineQueues() {
     let syncedPhotos = 0;
     for (const item of photos) {
       const resolvedInspectionId = item.inspection_client_id
-        ? await (await import("./offlineDb")).getInspectionMapping(item.inspection_client_id)
+        ? await getInspectionMapping(item.inspection_client_id)
         : item.inspection_id;
       const resolvedDefectId = item.defect_client_id
         ? await getDefectMapping(item.defect_client_id)
