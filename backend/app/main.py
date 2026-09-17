@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.api.routes.ai_detection import router as ai_detection_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.chainage_points import router as chainage_points_router
+from app.api.routes.condition_assessment import router as condition_assessment_router
 from app.api.routes.gps_tracks import router as gps_tracks_router
 from app.api.routes.images import router as images_router
 from app.api.routes.inspection_workflow import router as inspection_workflow_router
@@ -33,6 +34,7 @@ app.include_router(road_defects_router, prefix="/api/v1")
 app.include_router(maintenance_router, prefix="/api/v1")
 app.include_router(maintenance_plans_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(condition_assessment_router, prefix="/api/v1")
 app.include_router(gps_tracks_router, prefix="/api/v1")
 app.include_router(images_router, prefix="/api/v1")
 app.include_router(ai_detection_router, prefix="/api/v1")
