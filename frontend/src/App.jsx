@@ -19,6 +19,10 @@ import Reports from "./Reports";
 import WorkOrderManagement from "./WorkOrderManagement";
 import MaintenancePlanning from "./MaintenancePlanning";
 import ConditionAssessment from "./ConditionAssessment";
+import MaintenanceAnalytics from "./MaintenanceAnalytics";
+import MaintenanceEffectiveness from "./MaintenanceEffectiveness";
+import MaintenanceDecisionSupport from "./MaintenanceDecisionSupport";
+import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
 
 function App() {
   const [roads, setRoads] = useState([]); const [roadGeoJSON, setRoadGeoJSON] = useState(null); const [gpsGeoJSON, setGpsGeoJSON] = useState(null);
@@ -244,6 +248,10 @@ function App() {
     { id: "maintenance", label: "Maintenance" },
     { id: "planning", label: "Planning" },
     { id: "condition", label: "Condition" },
+    { id: "analytics", label: "Analytics" },
+    { id: "effectiveness", label: "Effectiveness" },
+    { id: "decision", label: "Decision support" },
+    { id: "workflow", label: "Workflow" },
     { id: "workorders", label: "Work orders" },
     { id: "reports", label: "Reports" },
   ];
@@ -318,21 +326,21 @@ function App() {
           <MaintenanceSection roads={roads} sections={sections} maintenanceRoadId={maintenanceRoadId} setMaintenanceRoadId={setMaintenanceRoadId} maintenance={maintenance} maintenanceLoading={maintenanceLoading} maintenanceForm={maintenanceForm} updateMaintenance={updateMaintenance} submitMaintenance={submitMaintenance} loadMaintenance={loadMaintenance} saving={saving} message={message} completedCount={completedCount} estimatedTotal={estimatedTotal} actualTotal={actualTotal} />
         )}
 
-        {activeTab === "planning" && (
-          <MaintenancePlanning />
-        )}
+        {activeTab === "planning" && <MaintenancePlanning />}
 
-        {activeTab === "condition" && (
-          <ConditionAssessment />
-        )}
+        {activeTab === "condition" && <ConditionAssessment />}
 
-        {activeTab === "workorders" && (
-          <WorkOrderManagement />
-        )}
+        {activeTab === "analytics" && <MaintenanceAnalytics />}
 
-        {activeTab === "reports" && (
-          <Reports />
-        )}
+        {activeTab === "effectiveness" && <MaintenanceEffectiveness />}
+
+        {activeTab === "decision" && <MaintenanceDecisionSupport />}
+
+        {activeTab === "workflow" && <InspectionWorkflowPanel />}
+
+        {activeTab === "workorders" && <WorkOrderManagement />}
+
+        {activeTab === "reports" && <Reports />}
 
         {showForm && (
           <InspectionDefectForm formType={formType} form={form} update={update} sections={sections} submitForm={submitForm} saving={saving} message={message} onClose={() => setShowForm(false)} />
