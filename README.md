@@ -22,34 +22,150 @@ RAMS is designed to support road agencies, maintenance teams, and engineers with
 - Role-based access and user management
 - Centralized database and API
 
-## Technology Direction
+## Technology Stack
 
-The project is being developed toward a modern web architecture, including:
+| Layer | Technology |
+|-------|------------|
+| Frontend | React + Vite + Leaflet |
+| Backend | FastAPI + SQLAlchemy |
+| Database | PostgreSQL + PostGIS |
+| Auth | JWT + bcrypt |
+| AI (planned) | Ultralytics YOLO |
 
-- **Frontend:** React
-- **Backend:** Python-based API
-- **Database:** Relational database
-- **GIS/GPS:** Spatial road and asset data
-- **AI/Computer Vision:** Planned support for automated road-condition and defect analysis
+## Getting Started
 
-> The technologies and features above describe the project's intended architecture and roadmap; implementation status may change as development progresses.
+### Option A — Docker (recommended)
 
-## Core Data Model
+**Requirements:** Docker and Docker Compose
 
-The system is expected to manage entities such as:
+```bash
+# Clone the repository
+git clone https://github.com/chandem/road-asset-management-system.git
+cd road-asset-management-system
 
-- Roads
-- Road sections
-- Chainage points
-- Coordinates and GPS tracks
-- Pavement condition
-- Road defects
-- Bridges and culverts
-- Drainage structures
-- Road signs and safety assets
-- Maintenance activities
-- Inspection records
-- Users and organizations
+# Start the full stack (PostGIS + backend + frontend)
+docker compose up --build
+```
+
+Once running:
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:5173 |
+| Backend API docs | http://localhost:8000/docs |
+| Health check | http://localhost:8000/health |
+
+The database schema is applied automatically on first start via `database/schema.sql`.
+
+To stop:
+
+```bash
+docker compose down
+```
+
+To reset the database (delete all data):
+
+```bash
+docker compose down -v
+```
+
+### Option B — Manual (local development)
+
+#### 1. Database
+
+Install PostgreSQL with PostGIS, then create the database and user:
+
+```sql
+CREATE USER rams_user WITH PASSWORD 'change_me';
+CREATE DATABASE rams OWNER rams_user;
+```
+
+Load the schema:
+
+```bash
+psql -U rams_user -d rams -f database/schema.sql
+```
+
+#### 2. Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+cp .env.example .env
+# Edit .env and set DATABASE_URL and JWT_SECRET_KEY (min 32 characters)
+
+uvicorn app.main:app --reload
+```
+
+API will be available at http://localhost:8000
+
+#### 3. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend will be available at http://localhost:5173
+
+### Create an admin user
+
+With the backend running and database configured:
+
+```bash
+cd backend
+# Make sure PYTHONPATH includes the backend directory and env vars are set
+export PYTHONPATH=.
+export DATABASE_URL=postgresql+psycopg://rams_user:change_me@localhost:5432/rams
+export JWT_SECRET_KEY=your-secret-at-least-32-characters-long
+
+python scripts/create_admin.py --username admin --full-name "Admin User" --email admin@example.com
+```
+
+You will be prompted for a password (minimum 8 characters).
+
+With Docker:
+
+```bash
+docker compose exec backend python scripts/create_admin.py --username admin --full-name "Admin User"
+```
+
+### Environment variables
+
+See `.env.example` (root) and `backend/.env.example` for the full list.
+
+Key variables:
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET_KEY` | Secret for signing tokens (min 32 chars) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime (default 60) |
+| `VITE_API_BASE_URL` | Frontend → backend API base URL |
+
+## Project Structure
+
+```text
+.
+├── backend/          # FastAPI application
+│   ├── app/
+│   │   ├── api/      # Routes
+│   │   ├── core/     # Config, security
+│   │   ├── db/       # Session
+│   │   ├── models/   # SQLAlchemy models
+│   │   ├── schemas/  # Pydantic schemas
+│   │   └── services/ # Business logic (e.g. AI detection)
+│   ├── scripts/      # create_admin.py, etc.
+│   └── tests/
+├── frontend/         # React + Vite UI
+├── database/         # schema.sql + migrations
+├── ai/               # YOLO training scripts
+└── docker-compose.yml
+```
 
 ## Development Roadmap
 
@@ -69,10 +185,6 @@ The system is expected to manage entities such as:
 🚧 **Active development**
 
 RAMS is under development and the architecture will evolve as new road-management requirements are added.
-
-## Getting Started
-
-Setup instructions will be added as the frontend, backend, and database components are established.
 
 ## Vision
 
