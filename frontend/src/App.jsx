@@ -29,7 +29,7 @@ function App() {
   const [activeTab, setActiveTab] = useState("overview");
   const [maintenanceRoadId, setMaintenanceRoadId] = useState(""); const [maintenance, setMaintenance] = useState([]);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
-  const [maintenanceForm, setMaintenanceForm] = useState({ activity_type: "", priority: "medium", planned_date: "", estimated_cost: "", contractor: "", description: "", section_id: "" });
+  const [maintenanceForm, setMaintenanceForm] = useState({ section_id: "", chainage_km: "", activity_type: "", priority: "medium", planned_date: "", completed_date: "", estimated_cost: "", actual_cost: "", contractor: "", status: "planned", description: "" });
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
 
   useEffect(() => {
@@ -117,13 +117,17 @@ function App() {
         activity_type: maintenanceForm.activity_type,
         priority: maintenanceForm.priority || null,
         planned_date: maintenanceForm.planned_date || null,
+        completed_date: maintenanceForm.completed_date || null,
         estimated_cost: maintenanceForm.estimated_cost ? Number(maintenanceForm.estimated_cost) : null,
+        actual_cost: maintenanceForm.actual_cost ? Number(maintenanceForm.actual_cost) : null,
         contractor: maintenanceForm.contractor || null,
         description: maintenanceForm.description || null,
+        status: maintenanceForm.status || "planned",
         section_id: maintenanceForm.section_id ? Number(maintenanceForm.section_id) : null,
+        chainage_km: maintenanceForm.chainage_km ? Number(maintenanceForm.chainage_km) : null,
       });
       setMessage("Maintenance activity saved.");
-      setMaintenanceForm({ activity_type: "", priority: "medium", planned_date: "", estimated_cost: "", contractor: "", description: "", section_id: "" });
+      setMaintenanceForm({ section_id: "", chainage_km: "", activity_type: "", priority: "medium", planned_date: "", completed_date: "", estimated_cost: "", actual_cost: "", contractor: "", status: "planned", description: "" });
       await loadMaintenance(maintenanceRoadId); await loadDashboard();
     } catch (err) { setMessage(err.message || String(err)); }
     finally { setSaving(false); }
@@ -232,39 +236,14 @@ function App() {
 
         {activeTab === "overview" && (
           <>
-            <SummaryCards
-              loading={loading}
-              roads={roads}
-              gpsGeoJSON={gpsGeoJSON}
-              sectionGeoJSON={sectionGeoJSON}
-              assetGeoJSON={assetGeoJSON}
-              defectGeoJSON={defectGeoJSON}
-            />
+            <SummaryCards loading={loading} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} />
             <ReportPanel report={report} onRefresh={loadDashboard} />
-            <RAMSMap
-              roadGeoJSON={roadGeoJSON}
-              gpsGeoJSON={gpsGeoJSON}
-              sectionGeoJSON={sectionGeoJSON}
-              assetGeoJSON={assetGeoJSON}
-              defectGeoJSON={defectGeoJSON}
-              visible={visible}
-              toggleLayer={toggleLayer}
-              loading={loading}
-            />
+            <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
           </>
         )}
 
         {activeTab === "map" && (
-          <RAMSMap
-            roadGeoJSON={roadGeoJSON}
-            gpsGeoJSON={gpsGeoJSON}
-            sectionGeoJSON={sectionGeoJSON}
-            assetGeoJSON={assetGeoJSON}
-            defectGeoJSON={defectGeoJSON}
-            visible={visible}
-            toggleLayer={toggleLayer}
-            loading={loading}
-          />
+          <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
         )}
 
         {activeTab === "field" && (
@@ -281,52 +260,16 @@ function App() {
             <OfflineDefectQueue sections={sections} />
             <OfflinePhotoQueue />
             <FieldGPS />
-            <PhotoAIPanel
-              photo={photo}
-              updatePhoto={updatePhoto}
-              submitPhoto={submitPhoto}
-              captureGPS={captureGPS}
-              saving={saving}
-              uploadedImageId={uploadedImageId}
-              aiResults={aiResults}
-              aiRunning={aiRunning}
-              detectPhoto={detectPhoto}
-              loadExistingDetections={loadExistingDetections}
-            />
+            <PhotoAIPanel photo={photo} updatePhoto={updatePhoto} submitPhoto={submitPhoto} captureGPS={captureGPS} saving={saving} uploadedImageId={uploadedImageId} aiResults={aiResults} aiRunning={aiRunning} detectPhoto={detectPhoto} loadExistingDetections={loadExistingDetections} />
           </>
         )}
 
         {activeTab === "maintenance" && (
-          <MaintenanceSection
-            roads={roads}
-            sections={sections}
-            maintenanceRoadId={maintenanceRoadId}
-            setMaintenanceRoadId={setMaintenanceRoadId}
-            maintenance={maintenance}
-            maintenanceLoading={maintenanceLoading}
-            maintenanceForm={maintenanceForm}
-            updateMaintenance={updateMaintenance}
-            submitMaintenance={submitMaintenance}
-            loadMaintenance={loadMaintenance}
-            saving={saving}
-            message={message}
-            completedCount={completedCount}
-            estimatedTotal={estimatedTotal}
-            actualTotal={actualTotal}
-          />
+          <MaintenanceSection roads={roads} sections={sections} maintenanceRoadId={maintenanceRoadId} setMaintenanceRoadId={setMaintenanceRoadId} maintenance={maintenance} maintenanceLoading={maintenanceLoading} maintenanceForm={maintenanceForm} updateMaintenance={updateMaintenance} submitMaintenance={submitMaintenance} loadMaintenance={loadMaintenance} saving={saving} message={message} completedCount={completedCount} estimatedTotal={estimatedTotal} actualTotal={actualTotal} />
         )}
 
         {showForm && (
-          <InspectionDefectForm
-            formType={formType}
-            form={form}
-            update={update}
-            sections={sections}
-            submitForm={submitForm}
-            saving={saving}
-            message={message}
-            onClose={() => setShowForm(false)}
-          />
+          <InspectionDefectForm formType={formType} form={form} update={update} sections={sections} submitForm={submitForm} saving={saving} message={message} onClose={() => setShowForm(false)} />
         )}
       </main>
     </div>
