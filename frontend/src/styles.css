@@ -94,6 +94,20 @@ th, td { padding: 10px 12px; border-bottom: 1px solid #eef1f5; text-align: left;
   background: #38bdf8;
   border-color: #38bdf8;
 }
+.ai-status-banner {
+  margin: 0 20px 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+.ai-status-banner strong { font-size: 13px; text-transform: uppercase; letter-spacing: 0.03em; }
+.ai-status-banner.ready { background: #ecfdf3; border: 1px solid #abefc6; color: #085d3a; }
+.ai-status-banner.stub { background: #fffaeb; border: 1px solid #fedf89; color: #93370d; }
+.ai-status-banner.unavailable { background: #fef3f2; border: 1px solid #fecdca; color: #912018; }
+.ai-inline-message { margin: 0 20px 12px; color: #667085; font-size: 14px; }
+.ai-empty { color: #667085; font-size: 13px; margin-top: 10px; }
 @media (max-width: 800px) {
   .cards { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding: 18px; align-items: flex-start; }
