@@ -29,6 +29,7 @@ RAMS is designed to support road agencies, maintenance teams, and engineers with
 | Frontend | React + Vite + Leaflet |
 | Backend | FastAPI + SQLAlchemy |
 | Database | PostgreSQL + PostGIS |
+| Migrations | Alembic |
 | Auth | JWT + bcrypt |
 | AI (planned) | Ultralytics YOLO |
 
@@ -55,7 +56,7 @@ Once running:
 | Backend API docs | http://localhost:8000/docs |
 | Health check | http://localhost:8000/health |
 
-The database schema is applied automatically on first start via `database/schema.sql`.
+On first start the DB loads `database/schema.sql`. The backend then runs `alembic upgrade head` so future schema changes are versioned.
 
 To stop:
 
@@ -80,7 +81,16 @@ CREATE USER rams_user WITH PASSWORD 'change_me';
 CREATE DATABASE rams OWNER rams_user;
 ```
 
-Load the schema:
+Apply the schema with Alembic (preferred):
+
+```bash
+cd backend
+export DATABASE_URL=postgresql+psycopg://rams_user:change_me@localhost:5432/rams
+pip install -r requirements.txt
+alembic upgrade head
+```
+
+Or load the SQL baseline once:
 
 ```bash
 psql -U rams_user -d rams -f database/schema.sql
@@ -152,6 +162,7 @@ Key variables:
 ```text
 .
 ├── backend/          # FastAPI application
+│   ├── alembic/      # Alembic migrations
 │   ├── app/
 │   │   ├── api/      # Routes
 │   │   ├── core/     # Config, security
@@ -162,7 +173,7 @@ Key variables:
 │   ├── scripts/      # create_admin.py, etc.
 │   └── tests/
 ├── frontend/         # React + Vite UI
-├── database/         # schema.sql + migrations
+├── database/         # schema.sql + legacy SQL migrations
 ├── ai/               # YOLO training scripts
 └── docker-compose.yml
 ```
