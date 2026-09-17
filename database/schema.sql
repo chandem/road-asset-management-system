@@ -128,6 +128,7 @@ CREATE TABLE road_defects (
     defect_id BIGSERIAL PRIMARY KEY,
     inspection_id BIGINT REFERENCES inspections(inspection_id) ON DELETE SET NULL,
     section_id BIGINT REFERENCES road_sections(section_id) ON DELETE SET NULL,
+    client_id VARCHAR(100) UNIQUE,
     defect_type VARCHAR(100) NOT NULL,
     severity VARCHAR(30),
     chainage_km NUMERIC(12,3),
@@ -236,4 +237,5 @@ CREATE INDEX idx_maintenance_plans_year ON maintenance_plans (plan_year);
 CREATE INDEX idx_maintenance_plans_status ON maintenance_plans (status);
 CREATE INDEX idx_maintenance_activities_plan ON maintenance_activities (plan_id);
 CREATE UNIQUE INDEX uq_inspections_client_id ON inspections (client_id) WHERE client_id IS NOT NULL;
+CREATE UNIQUE INDEX uq_road_defects_client_id ON road_defects (client_id) WHERE client_id IS NOT NULL;
 CREATE INDEX idx_users_username ON users (username);
