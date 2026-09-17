@@ -9,8 +9,8 @@ from app.api.routes.images import router as images_router
 from app.api.routes.inspection_workflow import router as inspection_workflow_router
 from app.api.routes.inspections import router as inspections_router
 from app.api.routes.maintenance import router as maintenance_router
-from app.api.routes.maintenance_decision_support import router as maintenance_decision_support_router
 from app.api.routes.maintenance_effectiveness import router as maintenance_effectiveness_router
+from app.api.routes.maintenance_geojson import router as maintenance_geojson_router
 from app.api.routes.maintenance_plans import router as maintenance_plans_router
 from app.api.routes.maintenance_strategy import router as maintenance_strategy_router
 from app.api.routes.reports import router as reports_router
@@ -22,11 +22,7 @@ from app.api.routes.users import router as users_router
 from app.api.routes.work_orders import router as work_orders_router
 from app.core.config import settings
 
-app = FastAPI(
-    title=f"{settings.app_name} API",
-    version="0.9.0",
-    debug=settings.debug,
-)
+app = FastAPI(title=f"{settings.app_name} API", version="0.9.0", debug=settings.debug)
 
 app.include_router(roads_router, prefix="/api/v1")
 app.include_router(road_sections_router, prefix="/api/v1")
@@ -36,8 +32,8 @@ app.include_router(inspections_router, prefix="/api/v1")
 app.include_router(inspection_workflow_router, prefix="/api/v1")
 app.include_router(road_defects_router, prefix="/api/v1")
 app.include_router(maintenance_router, prefix="/api/v1")
+app.include_router(maintenance_geojson_router, prefix="/api/v1")
 app.include_router(maintenance_effectiveness_router, prefix="/api/v1")
-app.include_router(maintenance_decision_support_router, prefix="/api/v1")
 app.include_router(maintenance_strategy_router, prefix="/api/v1")
 app.include_router(maintenance_plans_router, prefix="/api/v1")
 app.include_router(work_orders_router, prefix="/api/v1")
