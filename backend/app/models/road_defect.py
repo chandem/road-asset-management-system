@@ -20,6 +20,7 @@ class RoadDefect(Base):
         BigInteger,
         ForeignKey("rams.road_sections.section_id", ondelete="SET NULL"),
     )
+    client_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True)
     defect_type: Mapped[str] = mapped_column(String(100), nullable=False)
     severity: Mapped[Optional[str]] = mapped_column(String(30))
     chainage_km: Mapped[Optional[float]] = mapped_column(Numeric(12, 3))
