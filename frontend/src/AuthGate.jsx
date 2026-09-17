@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import App from "./App";
+import ConditionAssessment from "./ConditionAssessment";
 import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
 import MaintenanceAnalytics from "./MaintenanceAnalytics";
 import MaintenanceHistoryPanel from "./MaintenanceHistoryPanel";
@@ -53,5 +54,5 @@ export default function AuthGate() {
   if (checking) return <div className="auth-screen"><div className="auth-card"><h1>RAMS</h1><p>Checking session…</p></div></div>;
   if (!user) return <div className="auth-screen"><form className="auth-card" onSubmit={handleLogin}><div className="auth-logo">RAMS</div><h1>Road Asset Management System</h1><p className="auth-subtitle">Sign in to continue</p><label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /></label><label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>{error && <div className="auth-error">{error}</div>}<button className="auth-button" type="submit" disabled={loggingIn}>{loggingIn ? "Signing in…" : "Sign in"}</button></form></div>;
 
-  return <><div className="auth-userbar"><span>Signed in as <strong>{user.full_name || user.username}</strong> · {user.role}</span><button type="button" onClick={logout}>Logout</button></div><App /><MaintenancePlanning /><Reports /><InspectionWorkflowPanel /><MaintenanceAnalytics /><MaintenanceHistoryPanel /><OfflineInspectionQueue sections={offlineSections} /><OfflinePhotoQueue /></>;
+  return <><div className="auth-userbar"><span>Signed in as <strong>{user.full_name || user.username}</strong> · {user.role}</span><button type="button" onClick={logout}>Logout</button></div><App /><MaintenancePlanning /><ConditionAssessment /><Reports /><InspectionWorkflowPanel /><MaintenanceAnalytics /><MaintenanceHistoryPanel /><OfflineInspectionQueue sections={offlineSections} /><OfflinePhotoQueue /></>;
 }
