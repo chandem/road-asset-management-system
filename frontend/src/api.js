@@ -43,6 +43,7 @@ export function createMaintenance(roadId, payload) { return request(`/roads/${ro
 export function updateMaintenance(maintenanceId, payload) { return request(`/maintenance/${maintenanceId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
 export function getRoadMaintenanceEffectiveness(roadId) { return request(`/roads/${roadId}/maintenance-effectiveness`); }
 export function getMaintenanceEffectiveness(maintenanceId) { return request(`/maintenance/${maintenanceId}/effectiveness`); }
+export function getMaintenanceDecisionSupport(roadId) { return request(`/roads/${roadId}/maintenance-decision-support`); }
 export function getMaintenanceStrategy(roadId) {
   const query = roadId ? `?road_id=${encodeURIComponent(roadId)}` : "";
   return request(`/maintenance-strategy${query}`);
