@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes.ai_detection import router as ai_detection_router
 from app.api.routes.auth import router as auth_router
@@ -23,6 +25,18 @@ from app.api.routes.work_orders import router as work_orders_router
 from app.core.config import settings
 
 app = FastAPI(title=f"{settings.app_name} API", version="0.9.0", debug=settings.debug)
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.trusted_hosts,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
+)
 
 app.include_router(roads_router, prefix="/api/v1")
 app.include_router(road_sections_router, prefix="/api/v1")
