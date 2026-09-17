@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { syncOfflineQueues } from "./offlineSync";
+import { syncOfflineQueues, readLegacyPhotoQueue, clearLegacyPhotoQueue } from "./offlineSync";
+import { deletePhoto, getPhotos, putPhoto } from "./offlineDb";
 
-const QUEUE_KEY = "rams.offline.photo.queue";
 const INSPECTION_QUEUE_KEY = "rams.offline.inspection.queue";
 
 function loadQueue(key) {
@@ -14,7 +14,7 @@ function loadQueue(key) {
 }
 
 export default function OfflinePhotoQueue() {
-  const [queue, setQueue] = useState(() => loadQueue(QUEUE_KEY));
+  const [queue, setQueue] = useState([]);
   const [offlineInspections, setOfflineInspections] = useState(() => loadQueue(INSPECTION_QUEUE_KEY));
   const [file, setFile] = useState(null);
   const [inspectionId, setInspectionId] = useState("");
@@ -25,18 +25,38 @@ export default function OfflinePhotoQueue() {
   const [message, setMessage] = useState("");
   const [syncing, setSyncing] = useState(false);
 
-  useEffect(() => {
+  async function refreshQueues() {
     try {
-      localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-    } catch {
-      setMessage("Offline storage is unavailable on this device.");
+      const photos = await getPhotos();
+      setQueue(photos);
+    } catch (error) {
+      setMessage(`Offline database error: ${error.message}`);
     }
-  }, [queue]);
-
-  function refreshQueues() {
-    setQueue(loadQueue(QUEUE_KEY));
     setOfflineInspections(loadQueue(INSPECTION_QUEUE_KEY));
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    async function initialize() {
+      try {
+        // Migrate photos created by the previous localStorage implementation.
+        const legacy = readLegacyPhotoQueue();
+        for (const item of legacy) {
+          if (item.data_url) {
+            const response = await fetch(item.data_url);
+            const blob = await response.blob();
+            await putPhoto({ ...item, file: blob, data_url: undefined });
+          }
+        }
+        if (legacy.length) clearLegacyPhotoQueue();
+        if (!cancelled) await refreshQueues();
+      } catch (error) {
+        if (!cancelled) setMessage(`Offline storage migration error: ${error.message}`);
+      }
+    }
+    initialize();
+    return () => { cancelled = true; };
+  }, []);
 
   async function syncQueue() {
     if (!navigator.onLine || syncing) return;
@@ -44,7 +64,7 @@ export default function OfflinePhotoQueue() {
     setMessage("Synchronizing offline inspections and photos…");
     try {
       const result = await syncOfflineQueues();
-      refreshQueues();
+      await refreshQueues();
       setMessage(`Synced ${result.inspections} inspection(s) and ${result.photos} photo(s). ${result.remainingInspections} inspection(s) and ${result.remainingPhotos} photo(s) remain queued.`);
     } catch (error) {
       setMessage(`Synchronization failed: ${error.message}`);
@@ -55,17 +75,19 @@ export default function OfflinePhotoQueue() {
 
   useEffect(() => {
     const onOnline = () => syncQueue();
-    const onSyncComplete = refreshQueues;
+    const onSyncComplete = () => refreshQueues();
     window.addEventListener("online", onOnline);
     window.addEventListener("rams:offline-sync-complete", onSyncComplete);
     const timer = window.setInterval(syncQueue, 15000);
-    if (navigator.onLine && (queue.length || offlineInspections.length)) syncQueue();
+    const refreshTimer = window.setInterval(refreshQueues, 5000);
+    if (navigator.onLine) syncQueue();
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("rams:offline-sync-complete", onSyncComplete);
       window.clearInterval(timer);
+      window.clearInterval(refreshTimer);
     };
-  }, [queue.length, offlineInspections.length]);
+  }, []);
 
   function captureGPS() {
     if (!navigator.geolocation) {
@@ -90,18 +112,12 @@ export default function OfflinePhotoQueue() {
       return;
     }
     try {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error("Could not read photo"));
-        reader.readAsDataURL(file);
-      });
       const record = {
         id: `${Date.now()}-${file.name}`,
         file_name: file.name,
         mime_type: file.type,
         size: file.size,
-        data_url: dataUrl,
+        file,
         inspection_id: inspectionId ? Number(inspectionId) : null,
         inspection_client_id: inspectionClientId || null,
         defect_id: defectId ? Number(defectId) : null,
@@ -110,23 +126,27 @@ export default function OfflinePhotoQueue() {
         captured_at: new Date().toISOString(),
         synced: false,
       };
-      setQueue((current) => [...current, record]);
+      await putPhoto(record);
+      await refreshQueues();
       setFile(null);
       setInspectionId("");
       setInspectionClientId("");
       setDefectId("");
-      setMessage(`Photo ${file.name} saved offline and will synchronize automatically when online.`);
+      setMessage(`Photo ${file.name} saved to secure offline browser storage and will synchronize automatically.`);
+      event.target.reset();
     } catch (error) {
-      setMessage(`Photo error: ${error.message}`);
+      setMessage(`Photo storage error: ${error.message}`);
     }
   }
 
-  function removePhoto(id) {
-    setQueue((current) => current.filter((item) => item.id !== id));
+  async function removePhoto(id) {
+    await deletePhoto(id);
+    await refreshQueues();
   }
 
   function exportQueue() {
-    const blob = new Blob([JSON.stringify(queue, null, 2)], { type: "application/json" });
+    const metadata = queue.map(({ file, ...item }) => item);
+    const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -135,9 +155,10 @@ export default function OfflinePhotoQueue() {
     URL.revokeObjectURL(url);
   }
 
-  function clearQueue() {
+  async function clearQueue() {
     if (queue.length && window.confirm(`Delete ${queue.length} offline photo(s)?`)) {
-      setQueue([]);
+      for (const item of queue) await deletePhoto(item.id);
+      await refreshQueues();
       setMessage("Offline photo queue cleared.");
     }
   }
@@ -147,7 +168,7 @@ export default function OfflinePhotoQueue() {
       <div className="form-header">
         <div>
           <h2>📷 Offline Photo Capture</h2>
-          <p>Capture road photos without internet. Photos linked to offline inspections are uploaded after their inspection is synchronized.</p>
+          <p>Photos are stored as files in IndexedDB rather than browser localStorage, allowing larger offline queues and safer persistence.</p>
         </div>
         <div className="card"><span>Queued</span><strong>{queue.length}</strong></div>
       </div>
@@ -171,7 +192,7 @@ export default function OfflinePhotoQueue() {
         </div>
       </form>
       <div className="form-header">
-        <div><h3>Pending Offline Photos</h3><p>{queue.length ? "Stored in this browser/device until synchronized." : "No photos queued."}</p></div>
+        <div><h3>Pending Offline Photos</h3><p>{queue.length ? "Stored in IndexedDB on this device until synchronized." : "No photos queued."}</p></div>
         <div className="actions"><button type="button" onClick={exportQueue} disabled={!queue.length}>Export Data</button><button type="button" onClick={clearQueue} disabled={!queue.length}>Clear Queue</button></div>
       </div>
       {queue.length > 0 && <div className="table-wrap"><table><thead><tr><th>Photo</th><th>Inspection</th><th>Defect</th><th>GPS</th><th>Captured</th><th>Action</th></tr></thead><tbody>{queue.map((item) => <tr key={item.id}><td>{item.file_name}</td><td>{item.inspection_client_id ? `Offline: ${item.inspection_client_id}` : item.inspection_id ?? "—"}</td><td>{item.defect_id ?? "—"}</td><td>{item.latitude == null ? "—" : `${item.latitude}, ${item.longitude}`}</td><td>{new Date(item.captured_at).toLocaleString()}</td><td><button type="button" onClick={() => removePhoto(item.id)}>Remove</button></td></tr>)}</tbody></table></div>}
