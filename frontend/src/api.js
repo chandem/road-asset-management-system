@@ -23,6 +23,14 @@ async function request(path, options = {}) {
 export function getRoads() { return request("/roads"); }
 export function getRoadGeoJSON() { return request("/roads/geojson"); }
 export function getGPSTrackGeoJSON() { return request("/gps-tracks/geojson"); }
+export function getGPSMatch(latitude, longitude, maxDistanceM = 100) {
+  const params = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    max_distance_m: String(maxDistanceM),
+  });
+  return request(`/gps/match?${params.toString()}`);
+}
 export function getRoadSectionGeoJSON(roadId) { return request(`/roads/${roadId}/sections/geojson`); }
 export function getRoadAssetGeoJSON(roadId) { return request(`/roads/${roadId}/assets/geojson`); }
 export function getDefectGeoJSON() { return request("/defects/geojson"); }
