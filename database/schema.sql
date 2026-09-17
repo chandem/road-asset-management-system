@@ -163,6 +163,7 @@ CREATE TABLE maintenance_activities (
     plan_id BIGINT REFERENCES maintenance_plans(plan_id) ON DELETE SET NULL,
     activity_type VARCHAR(100) NOT NULL,
     priority VARCHAR(30),
+    chainage_km NUMERIC(12,3),
     planned_date DATE,
     completed_date DATE,
     estimated_cost NUMERIC(14,2),
@@ -170,6 +171,7 @@ CREATE TABLE maintenance_activities (
     contractor VARCHAR(200),
     status VARCHAR(30) NOT NULL DEFAULT 'planned',
     description TEXT,
+    CHECK (chainage_km IS NULL OR chainage_km >= 0),
     CHECK (estimated_cost IS NULL OR estimated_cost >= 0),
     CHECK (actual_cost IS NULL OR actual_cost >= 0)
 );
@@ -227,6 +229,7 @@ CREATE INDEX idx_assets_geometry ON road_assets USING GIST (geometry);
 CREATE INDEX idx_defects_geometry ON road_defects USING GIST (geometry);
 CREATE INDEX idx_gps_tracks_geometry ON gps_tracks USING GIST (geometry);
 CREATE INDEX idx_maintenance_source_defect ON maintenance_activities (source_defect_id);
+CREATE INDEX idx_maintenance_section_chainage ON maintenance_activities (section_id, chainage_km);
 CREATE INDEX idx_maintenance_history_maintenance ON maintenance_history (maintenance_id, changed_at DESC);
 CREATE INDEX idx_maintenance_history_changed_by ON maintenance_history (changed_by);
 CREATE INDEX idx_maintenance_plans_year ON maintenance_plans (plan_year);
