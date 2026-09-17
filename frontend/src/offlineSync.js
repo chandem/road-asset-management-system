@@ -1,21 +1,25 @@
 import { createInspection, uploadImage } from "./api";
-import { getInspectionMapping, getPhotos, putInspectionMapping, deletePhoto } from "./offlineDb";
+import { deleteInspection, getInspections, getInspectionMapping, getPhotos, putInspectionMapping, deletePhoto } from "./offlineDb";
 
-const INSPECTION_QUEUE_KEY = "rams.offline.inspection.queue";
+const LEGACY_INSPECTION_QUEUE_KEY = "rams.offline.inspection.queue";
 const LEGACY_PHOTO_QUEUE_KEY = "rams.offline.photo.queue";
 let activeSync = null;
 
-function readQueue(key) {
+function readLegacyQueue(key) {
   try {
     const value = localStorage.getItem(key);
     return value ? JSON.parse(value) : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
-function writeQueue(key, queue) {
-  localStorage.setItem(key, JSON.stringify(queue));
+async function migrateLegacyInspections() {
+  const legacy = readLegacyQueue(LEGACY_INSPECTION_QUEUE_KEY);
+  if (!legacy.length) return;
+  for (const item of legacy) {
+    const clientId = item.client_id || item.id || `${Date.now()}-${item.section_id}`;
+    await import("./offlineDb").then(({ putInspection }) => putInspection({ ...item, client_id: clientId, synced: false }));
+  }
+  localStorage.removeItem(LEGACY_INSPECTION_QUEUE_KEY);
 }
 
 function dataUrlToFile(dataUrl, fileName, mimeType) {
@@ -30,95 +34,55 @@ function dataUrlToFile(dataUrl, fileName, mimeType) {
 export async function syncOfflineQueues() {
   if (activeSync) return activeSync;
   if (!navigator.onLine) {
+    const inspections = await getInspections().catch(() => []);
     const photos = await getPhotos().catch(() => []);
-    return {
-      inspections: 0,
-      photos: 0,
-      remainingInspections: readQueue(INSPECTION_QUEUE_KEY).length,
-      remainingPhotos: photos.length,
-    };
+    return { inspections: 0, photos: 0, remainingInspections: inspections.filter((x) => !x.synced).length, remainingPhotos: photos.length };
   }
 
   activeSync = (async () => {
-    const inspections = readQueue(INSPECTION_QUEUE_KEY);
+    await migrateLegacyInspections();
+    const inspections = (await getInspections()).filter((item) => !item.synced);
     const photos = await getPhotos();
-    const failedInspections = [];
     let syncedInspections = 0;
 
     for (const item of inspections) {
-      const clientId = item.client_id || item.id;
       try {
         const result = await createInspection(item.section_id, {
           inspection_date: item.inspection_date,
           inspector_id: item.inspector_id ?? null,
-          client_id: clientId,
+          client_id: item.client_id,
           condition_rating: item.condition_rating,
           weather: item.weather,
           notes: item.notes,
         });
-        await putInspectionMapping(clientId, result.inspection_id);
+        await putInspectionMapping(item.client_id, result.inspection_id);
         syncedInspections += 1;
-      } catch {
-        failedInspections.push({ ...item, client_id: clientId });
-      }
+      } catch { /* Keep the record for the next retry. */ }
     }
-    writeQueue(INSPECTION_QUEUE_KEY, failedInspections);
 
+    const remainingInspections = (await getInspections()).filter((item) => !item.synced);
+    // Synced mappings are retained for a short-lived relationship between offline
+    // inspection IDs and server IDs, so photos can be uploaded after inspection sync.
     const failedPhotos = [];
     let syncedPhotos = 0;
     for (const item of photos) {
-      const resolvedInspectionId = item.inspection_client_id
-        ? await getInspectionMapping(item.inspection_client_id)
-        : item.inspection_id;
-
-      if (item.inspection_client_id && !resolvedInspectionId) {
-        failedPhotos.push(item);
-        continue;
-      }
-
+      const resolvedInspectionId = item.inspection_client_id ? await getInspectionMapping(item.inspection_client_id) : item.inspection_id;
+      if (item.inspection_client_id && !resolvedInspectionId) { failedPhotos.push(item); continue; }
       try {
         const file = item.file instanceof Blob
           ? new File([item.file], item.file_name || "road-photo.jpg", { type: item.mime_type || item.file.type })
           : dataUrlToFile(item.data_url, item.file_name, item.mime_type);
-        await uploadImage({
-          file,
-          inspectionId: resolvedInspectionId || null,
-          defectId: item.defect_id || null,
-          capturedAt: item.captured_at,
-          latitude: item.latitude,
-          longitude: item.longitude,
-        });
-        await deletePhoto(item.id);
-        syncedPhotos += 1;
-      } catch {
-        failedPhotos.push(item);
-      }
+        await uploadImage({ file, inspectionId: resolvedInspectionId || null, defectId: item.defect_id || null, capturedAt: item.captured_at, latitude: item.latitude, longitude: item.longitude });
+        await deletePhoto(item.id); syncedPhotos += 1;
+      } catch { failedPhotos.push(item); }
     }
 
-    const result = {
-      inspections: syncedInspections,
-      photos: syncedPhotos,
-      remainingInspections: failedInspections.length,
-      remainingPhotos: failedPhotos.length,
-    };
+    const result = { inspections: syncedInspections, photos: syncedPhotos, remainingInspections: remainingInspections.length, remainingPhotos: failedPhotos.length };
     window.dispatchEvent(new CustomEvent("rams:offline-sync-complete"));
     return result;
-  })().finally(() => {
-    activeSync = null;
-  });
-
+  })().finally(() => { activeSync = null; });
   return activeSync;
 }
 
-export function readLegacyPhotoQueue() {
-  try {
-    const value = localStorage.getItem(LEGACY_PHOTO_QUEUE_KEY);
-    return value ? JSON.parse(value) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function clearLegacyPhotoQueue() {
-  localStorage.removeItem(LEGACY_PHOTO_QUEUE_KEY);
-}
+export function readLegacyPhotoQueue() { return readLegacyQueue(LEGACY_PHOTO_QUEUE_KEY); }
+export function clearLegacyPhotoQueue() { localStorage.removeItem(LEGACY_PHOTO_QUEUE_KEY); }
