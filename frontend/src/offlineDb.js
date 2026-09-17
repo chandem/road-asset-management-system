@@ -1,7 +1,8 @@
 const DB_NAME = "rams-offline";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const PHOTO_STORE = "photos";
 const INSPECTION_STORE = "inspections";
+const DEFECT_STORE = "defects";
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -14,6 +15,7 @@ function openDb() {
       const db = request.result;
       if (!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE, { keyPath: "id" });
       if (!db.objectStoreNames.contains(INSPECTION_STORE)) db.createObjectStore(INSPECTION_STORE, { keyPath: "client_id" });
+      if (!db.objectStoreNames.contains(DEFECT_STORE)) db.createObjectStore(DEFECT_STORE, { keyPath: "client_id" });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("Could not open offline database"));
@@ -48,4 +50,15 @@ export async function putInspectionMapping(clientId, inspectionId) {
 export async function getInspectionMapping(clientId) {
   const record = await transaction(INSPECTION_STORE, "readonly", (store) => store.get(clientId));
   return record?.synced ? record.inspection_id ?? null : null;
+}
+
+export async function putDefect(defect) { await transaction(DEFECT_STORE, "readwrite", (store) => store.put(defect)); }
+export async function getDefects() { return (await transaction(DEFECT_STORE, "readonly", (store) => store.getAll())) || []; }
+export async function deleteDefect(clientId) { await transaction(DEFECT_STORE, "readwrite", (store) => store.delete(clientId)); }
+export async function putDefectMapping(clientId, defectId) {
+  await transaction(DEFECT_STORE, "readwrite", (store) => store.put({ client_id: clientId, defect_id: defectId, synced: true }));
+}
+export async function getDefectMapping(clientId) {
+  const record = await transaction(DEFECT_STORE, "readonly", (store) => store.get(clientId));
+  return record?.synced ? record.defect_id ?? null : null;
 }
