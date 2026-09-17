@@ -3,6 +3,7 @@ import {
   assignMaintenanceToPlan,
   createMaintenancePlan,
   getMaintenancePlanActivities,
+  getMaintenancePlanOptimization,
   getMaintenancePlanSummary,
   getMaintenancePlans,
   getRoadMaintenance,
@@ -17,6 +18,7 @@ export default function MaintenancePlanning() {
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [planActivities, setPlanActivities] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [optimization, setOptimization] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [form, setForm] = useState({
@@ -48,15 +50,18 @@ export default function MaintenancePlanning() {
     if (!planId) {
       setPlanActivities([]);
       setSummary(null);
+      setOptimization(null);
       return;
     }
     try {
-      const [pa, s] = await Promise.all([
+      const [pa, s, o] = await Promise.all([
         getMaintenancePlanActivities(Number(planId)),
         getMaintenancePlanSummary(Number(planId)),
+        getMaintenancePlanOptimization(Number(planId)),
       ]);
       setPlanActivities(pa);
       setSummary(s);
+      setOptimization(o);
     } catch (error) {
       setMessage(`Plan details error: ${error.message}`);
     }
@@ -143,6 +148,69 @@ export default function MaintenancePlanning() {
             <div><strong>Activities</strong><span>{summary?.activity_count ?? 0}</span></div>
             <div><strong>Completed</strong><span>{summary?.completed_count ?? 0}</span></div>
           </div>
+
+          <h3>Budget Optimization</h3>
+          <p>
+            Recommendations are ranked using maintenance priority, section condition rating, and timing urgency,
+            then selected in rank order until the plan budget is reached.
+          </p>
+          {optimization && (
+            <>
+              <div className="summary-grid">
+                <div><strong>Candidate cost</strong><span>{optimization.total_candidate_cost}</span></div>
+                <div><strong>Recommended cost</strong><span>{optimization.total_recommended_cost}</span></div>
+                <div><strong>Budget remaining</strong><span>{optimization.remaining_budget ?? "—"}</span></div>
+                <div><strong>Recommended</strong><span>{optimization.recommended_count}</span></div>
+                <div><strong>Excluded</strong><span>{optimization.excluded_count}</span></div>
+              </div>
+
+              <h4>Recommended activities</h4>
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Rank</th><th>ID</th><th>Activity</th><th>Priority</th><th>Condition</th><th>Score</th><th>Cost</th><th>Cumulative</th><th>Overdue</th></tr></thead>
+                  <tbody>
+                    {optimization.recommended.map((item, index) => (
+                      <tr key={item.maintenance_id}>
+                        <td>{index + 1}</td>
+                        <td>{item.maintenance_id}</td>
+                        <td>{item.activity_type}</td>
+                        <td>{item.priority}</td>
+                        <td>{item.condition_score ?? "—"}</td>
+                        <td>{item.score}</td>
+                        <td>{item.estimated_cost}</td>
+                        <td>{item.cumulative_cost}</td>
+                        <td>{item.overdue ? "Yes" : "No"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {optimization.excluded.length > 0 && (
+                <>
+                  <h4>Excluded because of budget</h4>
+                  <div className="table-wrap">
+                    <table>
+                      <thead><tr><th>ID</th><th>Activity</th><th>Priority</th><th>Condition</th><th>Score</th><th>Cost</th><th>Overdue</th></tr></thead>
+                      <tbody>
+                        {optimization.excluded.map((item) => (
+                          <tr key={item.maintenance_id}>
+                            <td>{item.maintenance_id}</td>
+                            <td>{item.activity_type}</td>
+                            <td>{item.priority}</td>
+                            <td>{item.condition_score ?? "—"}</td>
+                            <td>{item.score}</td>
+                            <td>{item.estimated_cost}</td>
+                            <td>{item.overdue ? "Yes" : "No"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </>
+          )}
 
           <h3>Priority allocation</h3>
           <div className="summary-grid">
