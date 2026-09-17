@@ -46,26 +46,18 @@ export function getMaintenancePlans() { return request("/maintenance-plans"); }
 export function getMaintenancePlan(planId) { return request(`/maintenance-plans/${planId}`); }
 export function getMaintenancePlanActivities(planId) { return request(`/maintenance-plans/${planId}/activities`); }
 export function getMaintenancePlanSummary(planId) { return request(`/maintenance-plans/${planId}/summary`); }
-export function createMaintenancePlan(payload) {
-  return request("/maintenance-plans", { method: "POST", body: JSON.stringify(payload) });
-}
-export function updateMaintenancePlan(planId, payload) {
-  return request(`/maintenance-plans/${planId}`, { method: "PATCH", body: JSON.stringify(payload) });
-}
-export function updateMaintenancePlanStatus(planId, status) {
-  return request(`/maintenance-plans/${planId}/status?status=${encodeURIComponent(status)}`, { method: "PATCH" });
-}
-export function assignMaintenanceToPlan(planId, maintenanceId) {
-  return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "POST" });
-}
-export function unassignMaintenanceFromPlan(planId, maintenanceId) {
-  return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "DELETE" });
-}
+export function createMaintenancePlan(payload) { return request("/maintenance-plans", { method: "POST", body: JSON.stringify(payload) }); }
+export function updateMaintenancePlan(planId, payload) { return request(`/maintenance-plans/${planId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
+export function updateMaintenancePlanStatus(planId, status) { return request(`/maintenance-plans/${planId}/status?status=${encodeURIComponent(status)}`, { method: "PATCH" }); }
+export function assignMaintenanceToPlan(planId, maintenanceId) { return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "POST" }); }
+export function unassignMaintenanceFromPlan(planId, maintenanceId) { return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "DELETE" }); }
 
 export function getMaintenanceReport(params = "") { return request(`/reports/maintenance${params}`); }
 export function getRoadConditionReport(params = "") { return request(`/reports/roads/condition${params}`); }
 export function getDefectReport(params = "") { return request(`/reports/defects${params}`); }
 export function getCostReport(params = "") { return request(`/reports/costs${params}`); }
+export function getSectionConditionAssessment(sectionId) { return request(`/sections/${sectionId}/condition-assessment`); }
+export function getRoadConditionAssessment(roadId) { return request(`/roads/${roadId}/condition-assessment`); }
 
 export function createInspection(sectionId, payload) { return request(`/sections/${sectionId}/inspections`, { method: "POST", body: JSON.stringify(payload) }); }
 export function createDefect(inspectionId, payload) { return request(`/inspections/${inspectionId}/defects`, { method: "POST", body: JSON.stringify(payload) }); }
