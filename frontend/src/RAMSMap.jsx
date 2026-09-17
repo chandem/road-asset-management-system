@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getChainagePoints, getRoadMaintenance } from "./api";
+import { getChainagePoints, getRoadMaintenanceGeoJSON } from "./api";
 
 const defaultCenter = [8.0, 39.0];
 
@@ -68,16 +68,6 @@ function chainageStyle(feature, latlng) {
   return L.circleMarker(latlng, { radius: 4, weight: 1, fillOpacity: 0.9 });
 }
 
-function getPointFromFeature(feature) {
-  const geometry = feature?.geometry;
-  if (!geometry) return null;
-  if (geometry.type === "Point") return geometry.coordinates;
-  if (geometry.type === "LineString" && geometry.coordinates.length) {
-    return geometry.coordinates[Math.floor(geometry.coordinates.length / 2)];
-  }
-  return null;
-}
-
 export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON, visible, toggleLayer, loading }) {
   const [chainageGeoJSON, setChainageGeoJSON] = useState(null);
   const [maintenanceGeoJSON, setMaintenanceGeoJSON] = useState(null);
@@ -107,19 +97,21 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
   useEffect(() => {
     let cancelled = false;
     async function loadSpatialLayers() {
-      if (!sectionGeoJSON?.features?.length) {
+      if (!sectionGeoJSON?.features?.length && !roadIds.length) {
         setChainageGeoJSON(null);
         setMaintenanceGeoJSON(null);
         return;
       }
       setSpatialLoading(true);
       try {
-        const sections = sectionGeoJSON.features;
+        const sections = sectionGeoJSON?.features || [];
         const sectionById = new Map(sections.map((f) => [Number(f?.properties?.section_id), f]));
         const sectionIds = [...new Set(sections.map((f) => f?.properties?.section_id).filter(Boolean))];
-        const chainageResults = await Promise.all(
-          sectionIds.map((id) => getChainagePoints(Number(id)).catch(() => [])),
-        );
+        const [chainageResults, maintenanceResults] = await Promise.all([
+          Promise.all(sectionIds.map((id) => getChainagePoints(Number(id)).catch(() => []))),
+          Promise.all(roadIds.map((id) => getRoadMaintenanceGeoJSON(Number(id)).catch(() => ({ type: "FeatureCollection", features: [] })))),
+        ]);
+
         const chainageFeatures = chainageResults.flatMap((points) => points.map((p) => ({
           type: "Feature",
           geometry: { type: "Point", coordinates: [Number(p.longitude), Number(p.latitude)] },
@@ -129,19 +121,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
           },
         })));
 
-        const maintenanceResults = await Promise.all(
-          roadIds.map((id) => getRoadMaintenance(Number(id)).catch(() => [])),
-        );
-        const maintenanceFeatures = maintenanceResults.flatMap((activities) => activities.flatMap((activity) => {
-          const section = sectionById.get(Number(activity.section_id));
-          const coordinates = getPointFromFeature(section);
-          if (!coordinates) return [];
-          return [{
-            type: "Feature",
-            geometry: { type: "Point", coordinates },
-            properties: { ...activity, road_id: Number(activity.road_id) || section?.properties?.road_id },
-          }];
-        }));
+        const maintenanceFeatures = maintenanceResults.flatMap((collection) => collection?.features || []);
 
         if (!cancelled) {
           setChainageGeoJSON({ type: "FeatureCollection", features: chainageFeatures });
