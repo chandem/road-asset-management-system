@@ -140,7 +140,7 @@ export default function FieldGPS() {
       id: `${position.timestamp}-${position.latitude}-${position.longitude}`,
       captured_at: new Date(position.timestamp).toISOString(), latitude: position.latitude, longitude: position.longitude,
       accuracy_m: position.accuracy, altitude_m: position.altitude,
-      road_id: gpsMatch?.road_id ?? roadId || null, section_id: gpsMatch?.section_id ?? sectionId || null,
+      road_id: gpsMatch?.road_id ?? (roadId || null), section_id: gpsMatch?.section_id ?? (sectionId || null),
       chainage_km: gpsMatch?.chainage_km ?? null, source: "field-gps-offline", synced: false,
     }]);
     setError("");
