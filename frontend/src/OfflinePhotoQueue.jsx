@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { syncOfflineQueues, readLegacyPhotoQueue, clearLegacyPhotoQueue } from "./offlineSync";
 import { deletePhoto, getDefects, getInspections, getPhotos, putPhoto } from "./offlineDb";
 
+function createClientId() {
+  return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export default function OfflinePhotoQueue() {
   const [queue, setQueue] = useState([]);
   const [offlineInspections, setOfflineInspections] = useState([]);
@@ -30,22 +34,33 @@ export default function OfflinePhotoQueue() {
   useEffect(() => {
     let cancelled = false;
     async function initialize() {
-      try {
-        const legacy = readLegacyPhotoQueue();
-        for (const item of legacy) {
-          if (item.data_url) {
-            const response = await fetch(item.data_url);
-            const blob = await response.blob();
-            await putPhoto({ ...item, file: blob, data_url: undefined });
-          }
-        }
-        if (legacy.length) clearLegacyPhotoQueue();
+      const legacy = readLegacyPhotoQueue();
+      if (!Array.isArray(legacy) || !legacy.length) {
         if (!cancelled) await refreshQueues();
-      } catch (error) {
-        if (!cancelled) setMessage(`Offline storage migration error: ${error.message}`);
+        return;
       }
+      const failed = [];
+      for (const [index, item] of legacy.entries()) {
+        try {
+          if (!item?.data_url) throw new Error("Photo has no image data");
+          const response = await fetch(item.data_url);
+          if (!response.ok) throw new Error(`Could not read legacy photo (${response.status})`);
+          const blob = await response.blob();
+          await putPhoto({ ...item, id: item.id || `legacy-${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`, file: blob, data_url: undefined });
+        } catch {
+          failed.push(item);
+        }
+      }
+      if (failed.length) {
+        try { localStorage.setItem("rams.offline.photo.queue", JSON.stringify(failed)); }
+        catch { /* Keep already migrated photos; a future app run may retry remaining legacy data. */ }
+        setMessage(`${failed.length} legacy photo(s) could not be migrated and remain queued for retry.`);
+      } else {
+        clearLegacyPhotoQueue();
+      }
+      if (!cancelled) await refreshQueues();
     }
-    initialize();
+    initialize().catch((error) => { if (!cancelled) setMessage(`Offline storage migration error: ${error.message}`); });
     return () => { cancelled = true; };
   }, []);
 
@@ -90,9 +105,11 @@ export default function OfflinePhotoQueue() {
   async function savePhoto(event) {
     event.preventDefault();
     if (!file) { setMessage("Select a photo first."); return; }
+    if (inspectionClientId && inspectionId) { setMessage("Choose either an offline inspection or an existing inspection ID, not both."); return; }
+    if (defectClientId && defectId) { setMessage("Choose either an offline defect or an existing defect ID, not both."); return; }
     try {
       const record = {
-        id: `${Date.now()}-${file.name}`,
+        id: createClientId(),
         file_name: file.name, mime_type: file.type, size: file.size, file,
         inspection_id: inspectionId ? Number(inspectionId) : null,
         inspection_client_id: inspectionClientId || null,
