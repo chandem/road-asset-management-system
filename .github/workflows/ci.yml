@@ -13,7 +13,7 @@ jobs:
     env:
       JWT_SECRET_KEY: test-secret-key-for-rams-ci-32-chars-minimum
       ACCESS_TOKEN_EXPIRE_MINUTES: "60"
-      PYTHONPATH: ${{ github.workspace }}/backend
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,7 +29,7 @@ jobs:
 
       - name: Compile Python files
         working-directory: backend
-        run: python -m compileall app scripts tests
+        run: python -m compileall app scripts tests ../ai
 
       - name: Run backend unit tests
         working-directory: backend
