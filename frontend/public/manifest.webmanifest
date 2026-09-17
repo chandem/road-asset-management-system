@@ -1,0 +1,19 @@
+{
+  "name": "Road Asset Management System",
+  "short_name": "RAMS",
+  "description": "Field-ready road asset management and inspection system.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icons/rams-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
