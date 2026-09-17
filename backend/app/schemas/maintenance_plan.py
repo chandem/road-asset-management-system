@@ -46,3 +46,28 @@ class MaintenancePlanSummaryResponse(BaseModel):
     remaining_budget: Optional[float] = None
     budget_utilization_percent: Optional[float] = None
     priority_counts: dict[str, int]
+
+
+class MaintenanceOptimizationItem(BaseModel):
+    maintenance_id: int
+    activity_type: str
+    priority: str
+    condition_score: Optional[float] = None
+    estimated_cost: float
+    planned_date: Optional[date] = None
+    score: float
+    overdue: bool
+    cumulative_cost: float
+    within_budget: bool
+
+
+class MaintenanceOptimizationResponse(BaseModel):
+    plan_id: int
+    budget: Optional[float] = None
+    total_candidate_cost: float
+    total_recommended_cost: float
+    remaining_budget: Optional[float] = None
+    recommended_count: int
+    excluded_count: int
+    recommended: list[MaintenanceOptimizationItem]
+    excluded: list[MaintenanceOptimizationItem]
