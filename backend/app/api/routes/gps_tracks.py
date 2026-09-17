@@ -51,11 +51,11 @@ def gps_tracks_geojson(db: DbSession, current_user: AuthenticatedUser):
 
 @router.get("/gps/match")
 def match_gps_position(
+    db: DbSession,
+    current_user: AuthenticatedUser,
     latitude: float = Query(..., ge=-90, le=90),
     longitude: float = Query(..., ge=-180, le=180),
     max_distance_m: float = Query(100, gt=0, le=5000),
-    db: DbSession = None,
-    current_user: AuthenticatedUser = None,
 ):
     gps_point = func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326)
     distance_m = func.ST_Distance(
