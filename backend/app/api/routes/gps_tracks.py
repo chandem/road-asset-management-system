@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -8,6 +8,7 @@ from app.core.security import AuthenticatedUser, FieldStaffUser
 from app.db.session import get_db
 from app.models.gps_track import GPSTrack
 from app.models.road import Road
+from app.models.road_section import RoadSection
 from app.schemas.gps_track import GPSTrackCreate, GPSTrackResponse
 
 router = APIRouter(tags=["GPS Tracks"])
@@ -46,6 +47,76 @@ def gps_tracks_geojson(db: DbSession, current_user: AuthenticatedUser):
         )
 
     return {"type": "FeatureCollection", "features": features}
+
+
+@router.get("/gps/match")
+def match_gps_position(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+    max_distance_m: float = Query(100, gt=0, le=5000),
+    db: DbSession = None,
+    current_user: AuthenticatedUser = None,
+):
+    gps_point = func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326)
+    distance_m = func.ST_Distance(
+        func.Geography(RoadSection.geometry),
+        func.Geography(gps_point),
+    )
+
+    row = db.execute(
+        select(
+            RoadSection.section_id,
+            RoadSection.road_id,
+            RoadSection.section_code,
+            RoadSection.start_chainage,
+            RoadSection.end_chainage,
+            RoadSection.length_km,
+            Road.road_code,
+            Road.road_name,
+            distance_m.label("distance_m"),
+            func.ST_LineLocatePoint(RoadSection.geometry, gps_point).label("fraction"),
+            func.ST_AsGeoJSON(
+                func.ST_LineInterpolatePoint(
+                    RoadSection.geometry,
+                    func.ST_LineLocatePoint(RoadSection.geometry, gps_point),
+                )
+            ).label("projected_point"),
+        )
+        .join(Road, Road.road_id == RoadSection.road_id)
+        .where(RoadSection.geometry.is_not(None))
+        .order_by(distance_m)
+        .limit(1)
+    ).first()
+
+    if row is None or float(row.distance_m) > max_distance_m:
+        return {
+            "matched": False,
+            "latitude": latitude,
+            "longitude": longitude,
+            "message": "No road section found within the maximum matching distance",
+            "max_distance_m": max_distance_m,
+        }
+
+    fraction = max(0.0, min(1.0, float(row.fraction)))
+    start_chainage = float(row.start_chainage)
+    end_chainage = float(row.end_chainage)
+    chainage_km = start_chainage + fraction * (end_chainage - start_chainage)
+
+    return {
+        "matched": True,
+        "latitude": latitude,
+        "longitude": longitude,
+        "road_id": row.road_id,
+        "road_code": row.road_code,
+        "road_name": row.road_name,
+        "section_id": row.section_id,
+        "section_code": row.section_code,
+        "distance_to_section_m": float(row.distance_m),
+        "chainage_km": round(chainage_km, 3),
+        "chainage_fraction": round(fraction, 6),
+        "projected_point": row.projected_point and __import__("json").loads(row.projected_point),
+        "message": "Chainage interpolated along the selected road section geometry",
+    }
 
 
 @router.get("/roads/{road_id}/gps-tracks", response_model=list[GPSTrackResponse])
