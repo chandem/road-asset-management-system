@@ -24,7 +24,7 @@ import MaintenanceEffectiveness from "./MaintenanceEffectiveness";
 import MaintenanceDecisionSupport from "./MaintenanceDecisionSupport";
 import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
 
-function App() {
+function App({ user }) {
   const [roads, setRoads] = useState([]); const [roadGeoJSON, setRoadGeoJSON] = useState(null); const [gpsGeoJSON, setGpsGeoJSON] = useState(null);
   const [sectionGeoJSON, setSectionGeoJSON] = useState(null); const [assetGeoJSON, setAssetGeoJSON] = useState(null); const [defectGeoJSON, setDefectGeoJSON] = useState(null);
   const [sections, setSections] = useState([]); const [inspections, setInspections] = useState([]); const [allMaintenance, setAllMaintenance] = useState([]);
@@ -241,7 +241,28 @@ function App() {
   const estimatedTotal = maintenance.reduce((s, m) => s + (Number(m.estimated_cost) || 0), 0);
   const actualTotal = maintenance.reduce((s, m) => s + (Number(m.actual_cost) || 0), 0);
 
-  const navGroups = [
+  const role = String(user?.role || "inspector").toLowerCase();
+
+  const TAB_ROLES = {
+    overview: ["admin", "engineer", "inspector", "field_staff"],
+    map: ["admin", "engineer", "inspector", "field_staff"],
+    field: ["admin", "engineer", "inspector", "field_staff"],
+    workflow: ["admin", "engineer", "inspector", "field_staff"],
+    maintenance: ["admin", "engineer"],
+    planning: ["admin", "engineer"],
+    workorders: ["admin", "engineer"],
+    condition: ["admin", "engineer", "inspector"],
+    analytics: ["admin", "engineer"],
+    effectiveness: ["admin", "engineer"],
+    decision: ["admin", "engineer"],
+    reports: ["admin", "engineer"],
+  };
+
+  function canAccessTab(tabId) {
+    return (TAB_ROLES[tabId] || ["admin"]).includes(role);
+  }
+
+  const allNavGroups = [
     {
       id: "home",
       label: "Home",
@@ -280,9 +301,20 @@ function App() {
     },
   ];
 
+  const navGroups = allNavGroups
+    .map((group) => ({ ...group, tabs: group.tabs.filter((t) => canAccessTab(t.id)) }))
+    .filter((group) => group.tabs.length > 0);
+
   const activeGroup =
-    navGroups.find((g) => g.tabs.some((t) => t.id === activeTab)) || navGroups[0];
+    navGroups.find((g) => g.tabs.some((t) => t.id === activeTab)) ||
+    navGroups[0] || { id: "home", label: "Home", tabs: [{ id: "overview", label: "Overview" }] };
   const groupTabs = activeGroup.tabs;
+
+  useEffect(() => {
+    if (!canAccessTab(activeTab) && groupTabs[0]) {
+      setActiveTab(groupTabs[0].id);
+    }
+  }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="app-shell">
@@ -295,6 +327,7 @@ function App() {
           <span className={`connectivity ${online ? "online" : "offline"}`}>
             {online ? "● Online" : "○ Offline"}
           </span>
+          <span className="status role-status">{role}</span>
           <span className="status">API v0.9</span>
         </div>
       </header>
@@ -309,9 +342,7 @@ function App() {
               aria-selected={activeGroup.id === group.id}
               className={`nav-group${activeGroup.id === group.id ? " active" : ""}`}
               onClick={() => {
-                if (activeGroup.id !== group.id) {
-                  setActiveTab(group.tabs[0].id);
-                }
+                if (activeGroup.id !== group.id) setActiveTab(group.tabs[0].id);
               }}
             >
               {group.label}
