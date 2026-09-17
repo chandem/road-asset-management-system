@@ -34,7 +34,11 @@ class FakeDB:
         return _Result()
 
     def execute(self, statement):
-        return []
+        class _Result:
+            def all(self_inner):
+                return []
+
+        return _Result()
 
 
 def make_user(**overrides) -> User:
