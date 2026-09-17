@@ -12,6 +12,7 @@ class MaintenanceActivityCreate(BaseModel):
     source_defect_id: Optional[int] = None
     activity_type: str = Field(min_length=1, max_length=100)
     priority: Optional[MaintenancePriority] = None
+    chainage_km: Optional[float] = Field(default=None, ge=0)
     planned_date: Optional[date] = None
     completed_date: Optional[date] = None
     estimated_cost: Optional[float] = Field(default=None, ge=0)
@@ -26,6 +27,7 @@ class MaintenanceActivityUpdate(BaseModel):
     source_defect_id: Optional[int] = None
     activity_type: Optional[str] = Field(default=None, min_length=1, max_length=100)
     priority: Optional[MaintenancePriority] = None
+    chainage_km: Optional[float] = Field(default=None, ge=0)
     planned_date: Optional[date] = None
     completed_date: Optional[date] = None
     estimated_cost: Optional[float] = Field(default=None, ge=0)
@@ -44,6 +46,7 @@ class MaintenanceActivityResponse(BaseModel):
     source_defect_id: Optional[int] = None
     activity_type: str
     priority: Optional[MaintenancePriority] = None
+    chainage_km: Optional[float] = None
     planned_date: Optional[date] = None
     completed_date: Optional[date] = None
     estimated_cost: Optional[float] = None
