@@ -96,10 +96,14 @@ def create_defect(
             return existing
 
     section_id = payload.section_id or inspection.section_id
+    section = None
     if section_id is not None:
         section = db.get(RoadSection, section_id)
         if section is None:
             raise HTTPException(status_code=400, detail="Road section not found")
+        inspection_section = db.get(RoadSection, inspection.section_id) if inspection.section_id is not None else None
+        if inspection_section is not None and section.road_id != inspection_section.road_id:
+            raise HTTPException(status_code=400, detail="Defect section does not belong to the inspection road")
 
         if payload.chainage_km is not None and not (
             float(section.start_chainage) <= payload.chainage_km <= float(section.end_chainage)
