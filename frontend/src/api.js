@@ -62,6 +62,11 @@ export function unassignMaintenanceFromPlan(planId, maintenanceId) {
   return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "DELETE" });
 }
 
+export function getMaintenanceReport(params = "") { return request(`/reports/maintenance${params}`); }
+export function getRoadConditionReport(params = "") { return request(`/reports/roads/condition${params}`); }
+export function getDefectReport(params = "") { return request(`/reports/defects${params}`); }
+export function getCostReport(params = "") { return request(`/reports/costs${params}`); }
+
 export function createInspection(sectionId, payload) { return request(`/sections/${sectionId}/inspections`, { method: "POST", body: JSON.stringify(payload) }); }
 export function createDefect(inspectionId, payload) { return request(`/inspections/${inspectionId}/defects`, { method: "POST", body: JSON.stringify(payload) }); }
 export function createGPSTrack(roadId, payload) { return request(`/roads/${roadId}/gps-tracks`, { method: "POST", body: JSON.stringify(payload) }); }
