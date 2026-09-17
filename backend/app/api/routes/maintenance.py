@@ -1,9 +1,8 @@
 from datetime import date, datetime, timezone
 from typing import Annotated
-import json
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import case, func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import AuthenticatedUser, EngineerUser
@@ -57,79 +56,6 @@ def list_maintenance(road_id: int, db: DbSession, current_user: AuthenticatedUse
         raise HTTPException(status_code=404, detail="Road not found")
     return db.scalars(select(MaintenanceActivity).where(MaintenanceActivity.road_id == road_id)
                       .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)).all()
-
-
-@router.get("/roads/{road_id}/maintenance/geojson")
-def maintenance_geojson(road_id: int, db: DbSession, current_user: AuthenticatedUser):
-    if db.get(Road, road_id) is None:
-        raise HTTPException(status_code=404, detail="Road not found")
-
-    fraction = case(
-        (
-            (MaintenanceActivity.chainage_km.is_not(None))
-            & (RoadSection.start_chainage.is_not(None))
-            & (RoadSection.end_chainage > RoadSection.start_chainage),
-            (MaintenanceActivity.chainage_km - RoadSection.start_chainage)
-            / (RoadSection.end_chainage - RoadSection.start_chainage),
-        ),
-        else_=0.5,
-    )
-    section_point = func.ST_LineInterpolatePoint(RoadSection.geometry, fraction)
-    point_geometry = func.coalesce(RoadDefect.geometry, section_point)
-
-    rows = db.execute(
-        select(
-            MaintenanceActivity.maintenance_id,
-            MaintenanceActivity.road_id,
-            MaintenanceActivity.section_id,
-            MaintenanceActivity.source_defect_id,
-            MaintenanceActivity.activity_type,
-            MaintenanceActivity.priority,
-            MaintenanceActivity.chainage_km,
-            MaintenanceActivity.planned_date,
-            MaintenanceActivity.completed_date,
-            MaintenanceActivity.estimated_cost,
-            MaintenanceActivity.actual_cost,
-            MaintenanceActivity.contractor,
-            MaintenanceActivity.status,
-            MaintenanceActivity.description,
-            RoadSection.section_code,
-            RoadSection.condition_rating,
-            func.ST_AsGeoJSON(point_geometry),
-        )
-        .select_from(MaintenanceActivity)
-        .outerjoin(RoadSection, RoadSection.section_id == MaintenanceActivity.section_id)
-        .outerjoin(RoadDefect, RoadDefect.defect_id == MaintenanceActivity.source_defect_id)
-        .where(MaintenanceActivity.road_id == road_id)
-        .order_by(MaintenanceActivity.chainage_km, MaintenanceActivity.maintenance_id)
-    ).all()
-
-    features = []
-    for row in rows:
-        geometry = json.loads(row[16]) if row[16] else None
-        features.append({
-            "type": "Feature",
-            "geometry": geometry,
-            "properties": {
-                "maintenance_id": row[0],
-                "road_id": row[1],
-                "section_id": row[2],
-                "source_defect_id": row[3],
-                "activity_type": row[4],
-                "priority": row[5],
-                "chainage_km": float(row[6]) if row[6] is not None else None,
-                "planned_date": _serialize_value(row[7]),
-                "completed_date": _serialize_value(row[8]),
-                "estimated_cost": float(row[9]) if row[9] is not None else None,
-                "actual_cost": float(row[10]) if row[10] is not None else None,
-                "contractor": row[11],
-                "status": row[12],
-                "description": row[13],
-                "section_code": row[14],
-                "condition_rating": float(row[15]) if row[15] is not None else None,
-            },
-        })
-    return {"type": "FeatureCollection", "features": features}
 
 
 @router.get("/defects/{defect_id}/maintenance", response_model=list[MaintenanceActivityResponse])
