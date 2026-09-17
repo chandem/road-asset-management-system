@@ -18,6 +18,7 @@ class Inspection(Base):
         nullable=False,
     )
     inspector_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    client_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True)
     inspection_date: Mapped[date] = mapped_column(Date, nullable=False)
     condition_rating: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
     weather: Mapped[Optional[str]] = mapped_column(String(100))
