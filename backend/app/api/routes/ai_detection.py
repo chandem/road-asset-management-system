@@ -12,10 +12,16 @@ from app.schemas.ai_detection_result import (
     AIDetectionResultCreate,
     AIDetectionResultResponse,
 )
-from app.services.defect_detector import get_detector
+from app.services.defect_detector import ModelUnavailableError, get_detector
 
 router = APIRouter(tags=["AI Detection"])
 DbSession = Annotated[Session, Depends(get_db)]
+
+
+@router.get("/ai/status")
+def ai_status(current_user: AuthenticatedUser):
+    """Report whether road-defect AI inference is configured and ready."""
+    return get_detector().status()
 
 
 @router.get(
@@ -69,7 +75,9 @@ def create_ai_detection(
         db.commit()
     except Exception:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Could not create AI detection result")
+        raise HTTPException(
+            status_code=400, detail="Could not create AI detection result"
+        )
 
     db.refresh(detection)
     return detection
@@ -88,15 +96,26 @@ def run_ai_detection(
     if image is None:
         raise HTTPException(status_code=404, detail="Image not found")
 
+    detector = get_detector()
     try:
-        detector = get_detector()
         predictions = detector.predict(image.file_path)
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Image file is missing on the server. Re-upload the photo and try again.",
+        ) from exc
+    except ModelUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI inference is temporarily unavailable. Try again later.",
+        ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"AI inference failed: {exc}") from exc
+        raise HTTPException(
+            status_code=500,
+            detail="AI inference failed unexpectedly. Check server logs for details.",
+        ) from exc
 
     results = []
     for prediction in predictions:
