@@ -2,6 +2,7 @@ import { createInspection, uploadImage } from "./api";
 
 const INSPECTION_QUEUE_KEY = "rams.offline.inspection.queue";
 const PHOTO_QUEUE_KEY = "rams.offline.photo.queue";
+const INSPECTION_MAP_KEY = "rams.offline.inspection.map";
 let activeSync = null;
 
 function readQueue(key) {
@@ -15,6 +16,19 @@ function readQueue(key) {
 
 function writeQueue(key, queue) {
   localStorage.setItem(key, JSON.stringify(queue));
+}
+
+function readInspectionMap() {
+  try {
+    const value = localStorage.getItem(INSPECTION_MAP_KEY);
+    return value ? JSON.parse(value) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeInspectionMap(map) {
+  localStorage.setItem(INSPECTION_MAP_KEY, JSON.stringify(map));
 }
 
 function dataUrlToFile(dataUrl, fileName, mimeType) {
@@ -40,7 +54,7 @@ export function syncOfflineQueues() {
   activeSync = (async () => {
     const inspections = readQueue(INSPECTION_QUEUE_KEY);
     const photos = readQueue(PHOTO_QUEUE_KEY);
-    const inspectionIds = new Map();
+    const inspectionMap = readInspectionMap();
     const failedInspections = [];
     let syncedInspections = 0;
 
@@ -55,19 +69,20 @@ export function syncOfflineQueues() {
           weather: item.weather,
           notes: item.notes,
         });
-        inspectionIds.set(clientId, result.inspection_id);
+        inspectionMap[clientId] = result.inspection_id;
         syncedInspections += 1;
       } catch {
         failedInspections.push({ ...item, client_id: clientId });
       }
     }
     writeQueue(INSPECTION_QUEUE_KEY, failedInspections);
+    writeInspectionMap(inspectionMap);
 
     const failedPhotos = [];
     let syncedPhotos = 0;
     for (const item of photos) {
       const resolvedInspectionId = item.inspection_client_id
-        ? inspectionIds.get(item.inspection_client_id)
+        ? inspectionMap[item.inspection_client_id]
         : item.inspection_id;
 
       if (item.inspection_client_id && !resolvedInspectionId) {
