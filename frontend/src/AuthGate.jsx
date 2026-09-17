@@ -1,17 +1,6 @@
 import { useEffect, useState } from "react";
 import App from "./App";
-import ConditionAssessment from "./ConditionAssessment";
-import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
-import MaintenanceAnalytics from "./MaintenanceAnalytics";
-import MaintenanceDecisionSupport from "./MaintenanceDecisionSupport";
-import MaintenanceEffectiveness from "./MaintenanceEffectiveness";
-import MaintenanceHistoryPanel from "./MaintenanceHistoryPanel";
-import MaintenancePlanning from "./MaintenancePlanning";
-import OfflineInspectionQueue from "./OfflineInspectionQueue";
-import OfflinePhotoQueue from "./OfflinePhotoQueue";
-import Reports from "./Reports";
-import WorkOrderManagement from "./WorkOrderManagement";
-import { API_BASE, getRoadSections, getRoads } from "./api";
+import { API_BASE } from "./api";
 import { clearToken, getToken, setToken } from "./auth";
 
 export default function AuthGate() {
@@ -21,41 +10,112 @@ export default function AuthGate() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
-  const [offlineSections, setOfflineSections] = useState([]);
 
   useEffect(() => {
     const token = getToken();
-    if (!token) { setChecking(false); return; }
+    if (!token) {
+      setChecking(false);
+      return;
+    }
     fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(async (response) => { if (!response.ok) throw new Error("Session expired"); return response.json(); })
-      .then(setUser).catch(() => clearToken()).finally(() => setChecking(false));
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Session expired");
+        return response.json();
+      })
+      .then(setUser)
+      .catch(() => clearToken())
+      .finally(() => setChecking(false));
   }, []);
 
-  useEffect(() => {
-    if (!user) return undefined;
-    let active = true;
-    getRoads()
-      .then((roads) => Promise.all(roads.map((road) => getRoadSections(road.road_id))))
-      .then((groups) => { if (active) setOfflineSections(groups.flat()); })
-      .catch(() => { if (active) setOfflineSections([]); });
-    return () => { active = false; };
-  }, [user]);
-
   async function handleLogin(event) {
-    event.preventDefault(); setLoggingIn(true); setError("");
+    event.preventDefault();
+    setLoggingIn(true);
+    setError("");
     try {
-      const response = await fetch(`${API_BASE}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Login failed");
-      setToken(data.access_token); setUser(data); setPassword("");
-    } catch (err) { setError(err.message || "Unable to log in"); }
-    finally { setLoggingIn(false); }
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = typeof data.detail === "string" ? data.detail : "Login failed";
+        throw new Error(detail);
+      }
+      setToken(data.access_token);
+      setUser(data);
+      setPassword("");
+    } catch (err) {
+      setError(err.message || "Unable to log in");
+    } finally {
+      setLoggingIn(false);
+    }
   }
 
-  function logout() { clearToken(); setUser(null); }
+  function logout() {
+    clearToken();
+    setUser(null);
+  }
 
-  if (checking) return <div className="auth-screen"><div className="auth-card"><h1>RAMS</h1><p>Checking session…</p></div></div>;
-  if (!user) return <div className="auth-screen"><form className="auth-card" onSubmit={handleLogin}><div className="auth-logo">RAMS</div><h1>Road Asset Management System</h1><p className="auth-subtitle">Sign in to continue</p><label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /></label><label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>{error && <div className="auth-error">{error}</div>}<button className="auth-button" type="submit" disabled={loggingIn}>{loggingIn ? "Signing in…" : "Sign in"}</button></form></div>;
+  if (checking) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <h1>RAMS</h1>
+          <p>Checking session…</p>
+        </div>
+      </div>
+    );
+  }
 
-  return <><div className="auth-userbar"><span>Signed in as <strong>{user.full_name || user.username}</strong> · {user.role}</span><button type="button" onClick={logout}>Logout</button></div><App /><MaintenancePlanning /><MaintenanceEffectiveness /><MaintenanceDecisionSupport /><WorkOrderManagement /><ConditionAssessment /><Reports /><InspectionWorkflowPanel /><MaintenanceAnalytics /><MaintenanceHistoryPanel /><OfflineInspectionQueue sections={offlineSections} /><OfflinePhotoQueue /></>;
+  if (!user) {
+    return (
+      <div className="auth-screen">
+        <form className="auth-card" onSubmit={handleLogin}>
+          <div className="auth-logo">RAMS</div>
+          <h1>Road Asset Management System</h1>
+          <p className="auth-subtitle">Sign in to continue</p>
+          <label>
+            Username
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              required
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          {error && <div className="auth-error">{error}</div>}
+          <button className="auth-button" type="submit" disabled={loggingIn}>
+            {loggingIn ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="auth-userbar">
+        <span>
+          Signed in as <strong>{user.full_name || user.username}</strong>
+          {" · "}
+          <span className="role-badge">{user.role}</span>
+        </span>
+        <button type="button" onClick={logout}>
+          Logout
+        </button>
+      </div>
+      <App user={user} />
+    </>
+  );
 }
