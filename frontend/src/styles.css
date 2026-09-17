@@ -69,6 +69,31 @@ table { min-width: 700px; width: 100%; border-collapse: collapse; }
 th, td { padding: 10px 12px; border-bottom: 1px solid #eef1f5; text-align: left; white-space: nowrap; }
 .form-footer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .form-footer span { color: #667085; }
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.65rem 1.25rem;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+}
+.nav-tab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #94a3b8;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nav-tab:hover { color: #e2e8f0; background: #1e293b; }
+.nav-tab.active {
+  color: #0f172a;
+  background: #38bdf8;
+  border-color: #38bdf8;
+}
 @media (max-width: 800px) {
   .cards { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding: 18px; align-items: flex-start; }
@@ -81,6 +106,10 @@ th, td { padding: 10px 12px; border-bottom: 1px solid #eef1f5; text-align: left;
   .field-gps-panel .form-header, .offline-inspection-panel .form-header, .offline-photo-panel .form-header { align-items: flex-start; flex-direction: column; }
   .offline-inspection-panel form, .offline-photo-panel form { padding-left: 14px; padding-right: 14px; }
   .offline-inspection-panel .form-header, .offline-photo-panel .form-header { padding-left: 14px; padding-right: 14px; }
+}
+@media (max-width: 640px) {
+  .app-nav { padding: 0.5rem 0.75rem; }
+  .nav-tab { font-size: 0.85rem; padding: 0.4rem 0.75rem; }
 }
 @media (max-width: 520px) {
   .cards { grid-template-columns: 1fr; }
