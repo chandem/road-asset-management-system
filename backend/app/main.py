@@ -16,6 +16,7 @@ from app.api.routes.road_defects import router as road_defects_router
 from app.api.routes.road_sections import router as road_sections_router
 from app.api.routes.roads import router as roads_router
 from app.api.routes.users import router as users_router
+from app.api.routes.work_orders import router as work_orders_router
 from app.core.config import settings
 
 app = FastAPI(
@@ -33,6 +34,7 @@ app.include_router(inspection_workflow_router, prefix="/api/v1")
 app.include_router(road_defects_router, prefix="/api/v1")
 app.include_router(maintenance_router, prefix="/api/v1")
 app.include_router(maintenance_plans_router, prefix="/api/v1")
+app.include_router(work_orders_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
 app.include_router(condition_assessment_router, prefix="/api/v1")
 app.include_router(gps_tracks_router, prefix="/api/v1")
