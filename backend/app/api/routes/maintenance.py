@@ -23,9 +23,8 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 AUDIT_FIELDS = (
-    "road_id", "section_id", "source_defect_id", "activity_type", "priority",
-    "planned_date", "completed_date", "estimated_cost", "actual_cost",
-    "contractor", "status", "description",
+    "road_id", "section_id", "source_defect_id", "activity_type", "priority", "chainage_km",
+    "planned_date", "completed_date", "estimated_cost", "actual_cost", "contractor", "status", "description",
 )
 
 
@@ -36,58 +35,35 @@ def _serialize_value(value):
 
 
 def _activity_values(activity: MaintenanceActivity) -> dict:
-    return {
-        field: _serialize_value(getattr(activity, field))
-        for field in AUDIT_FIELDS
-    }
+    return {field: _serialize_value(getattr(activity, field)) for field in AUDIT_FIELDS}
 
 
-def _add_history(
-    db: Session,
-    activity: MaintenanceActivity,
-    changed_by: int | None,
-    action: str,
-    old_values: dict | None = None,
-    new_values: dict | None = None,
-):
-    db.add(
-        MaintenanceHistory(
-            maintenance_id=activity.maintenance_id,
-            changed_by=changed_by,
-            action=action,
-            changed_at=datetime.now(timezone.utc),
-            old_values=old_values,
-            new_values=new_values,
-        )
-    )
+def _add_history(db: Session, activity: MaintenanceActivity, changed_by: int | None, action: str,
+                 old_values: dict | None = None, new_values: dict | None = None):
+    db.add(MaintenanceHistory(
+        maintenance_id=activity.maintenance_id,
+        changed_by=changed_by,
+        action=action,
+        changed_at=datetime.now(timezone.utc),
+        old_values=old_values,
+        new_values=new_values,
+    ))
 
 
 @router.get("/roads/{road_id}/maintenance", response_model=list[MaintenanceActivityResponse])
 def list_maintenance(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
-
-    return db.scalars(
-        select(MaintenanceActivity)
-        .where(MaintenanceActivity.road_id == road_id)
-        .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)
-    ).all()
+    return db.scalars(select(MaintenanceActivity).where(MaintenanceActivity.road_id == road_id)
+                      .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)).all()
 
 
 @router.get("/defects/{defect_id}/maintenance", response_model=list[MaintenanceActivityResponse])
-def list_defect_maintenance(
-    defect_id: int,
-    db: DbSession,
-    current_user: AuthenticatedUser,
-):
+def list_defect_maintenance(defect_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(RoadDefect, defect_id) is None:
         raise HTTPException(status_code=404, detail="Defect not found")
-
-    return db.scalars(
-        select(MaintenanceActivity)
-        .where(MaintenanceActivity.source_defect_id == defect_id)
-        .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)
-    ).all()
+    return db.scalars(select(MaintenanceActivity).where(MaintenanceActivity.source_defect_id == defect_id)
+                      .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)).all()
 
 
 @router.get("/maintenance/{maintenance_id}", response_model=MaintenanceActivityResponse)
@@ -99,27 +75,15 @@ def get_maintenance(maintenance_id: int, db: DbSession, current_user: Authentica
 
 
 @router.get("/maintenance/{maintenance_id}/history")
-def list_maintenance_history(
-    maintenance_id: int,
-    db: DbSession,
-    current_user: AuthenticatedUser,
-):
+def list_maintenance_history(maintenance_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(MaintenanceActivity, maintenance_id) is None:
         raise HTTPException(status_code=404, detail="Maintenance activity not found")
-
-    return db.scalars(
-        select(MaintenanceHistory)
-        .where(MaintenanceHistory.maintenance_id == maintenance_id)
-        .order_by(MaintenanceHistory.changed_at.desc(), MaintenanceHistory.history_id.desc())
-    ).all()
+    return db.scalars(select(MaintenanceHistory).where(MaintenanceHistory.maintenance_id == maintenance_id)
+                      .order_by(MaintenanceHistory.changed_at.desc(), MaintenanceHistory.history_id.desc())).all()
 
 
-def _validate_links(
-    db: Session,
-    road_id: int,
-    section_id: int | None,
-    source_defect_id: int | None,
-):
+def _validate_links(db: Session, road_id: int, section_id: int | None, source_defect_id: int | None,
+                    chainage_km: float | None = None):
     section = None
     if section_id is not None:
         section = db.get(RoadSection, section_id)
@@ -130,13 +94,17 @@ def _validate_links(
         defect = db.get(RoadDefect, source_defect_id)
         if defect is None:
             raise HTTPException(status_code=404, detail="Source defect not found")
-
         defect_section = db.get(RoadSection, defect.section_id)
         if defect_section is None or defect_section.road_id != road_id:
             raise HTTPException(status_code=400, detail="Source defect does not belong to this road")
-
         if section is not None and defect.section_id != section.section_id:
             raise HTTPException(status_code=400, detail="Source defect does not belong to the selected section")
+
+    if chainage_km is not None:
+        if section is None:
+            raise HTTPException(status_code=400, detail="section_id is required when chainage_km is provided")
+        if chainage_km < float(section.start_chainage) or chainage_km > float(section.end_chainage):
+            raise HTTPException(status_code=400, detail="chainage_km must be within the selected road section range")
 
 
 def _validate_dates(planned_date, completed_date):
@@ -144,38 +112,20 @@ def _validate_dates(planned_date, completed_date):
         raise HTTPException(status_code=400, detail="completed_date cannot be before planned_date")
 
 
-@router.post(
-    "/roads/{road_id}/maintenance",
-    response_model=MaintenanceActivityResponse,
-    status_code=201,
-)
-def create_maintenance(
-    road_id: int,
-    payload: MaintenanceActivityCreate,
-    db: DbSession,
-    current_user: EngineerUser,
-):
+@router.post("/roads/{road_id}/maintenance", response_model=MaintenanceActivityResponse, status_code=201)
+def create_maintenance(road_id: int, payload: MaintenanceActivityCreate, db: DbSession, current_user: EngineerUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
-
-    _validate_links(db, road_id, payload.section_id, payload.source_defect_id)
+    _validate_links(db, road_id, payload.section_id, payload.source_defect_id, payload.chainage_km)
     _validate_dates(payload.planned_date, payload.completed_date)
 
     activity = MaintenanceActivity(
-        road_id=road_id,
-        section_id=payload.section_id,
-        source_defect_id=payload.source_defect_id,
-        activity_type=payload.activity_type,
-        priority=payload.priority,
-        planned_date=payload.planned_date,
-        completed_date=payload.completed_date,
-        estimated_cost=payload.estimated_cost,
-        actual_cost=payload.actual_cost,
-        contractor=payload.contractor,
-        status=payload.status,
-        description=payload.description,
+        road_id=road_id, section_id=payload.section_id, source_defect_id=payload.source_defect_id,
+        activity_type=payload.activity_type, priority=payload.priority, chainage_km=payload.chainage_km,
+        planned_date=payload.planned_date, completed_date=payload.completed_date,
+        estimated_cost=payload.estimated_cost, actual_cost=payload.actual_cost,
+        contractor=payload.contractor, status=payload.status, description=payload.description,
     )
-
     db.add(activity)
     try:
         db.flush()
@@ -184,21 +134,12 @@ def create_maintenance(
     except Exception:
         db.rollback()
         raise HTTPException(status_code=400, detail="Could not create maintenance activity")
-
     db.refresh(activity)
     return activity
 
 
-@router.patch(
-    "/maintenance/{maintenance_id}",
-    response_model=MaintenanceActivityResponse,
-)
-def update_maintenance(
-    maintenance_id: int,
-    payload: MaintenanceActivityUpdate,
-    db: DbSession,
-    current_user: EngineerUser,
-):
+@router.patch("/maintenance/{maintenance_id}", response_model=MaintenanceActivityResponse)
+def update_maintenance(maintenance_id: int, payload: MaintenanceActivityUpdate, db: DbSession, current_user: EngineerUser):
     activity = db.get(MaintenanceActivity, maintenance_id)
     if activity is None:
         raise HTTPException(status_code=404, detail="Maintenance activity not found")
@@ -207,34 +148,28 @@ def update_maintenance(
     data = payload.model_dump(exclude_unset=True)
     section_id = data.get("section_id", activity.section_id)
     source_defect_id = data.get("source_defect_id", activity.source_defect_id)
-    _validate_links(db, activity.road_id, section_id, source_defect_id)
-
-    planned_date = data.get("planned_date", activity.planned_date)
-    completed_date = data.get("completed_date", activity.completed_date)
-    _validate_dates(planned_date, completed_date)
+    chainage_km = data.get("chainage_km", activity.chainage_km)
+    _validate_links(db, activity.road_id, section_id, source_defect_id, chainage_km)
+    _validate_dates(data.get("planned_date", activity.planned_date), data.get("completed_date", activity.completed_date))
 
     previous_status = activity.status
     for field, value in data.items():
         setattr(activity, field, value)
-
     if activity.status == "completed" and activity.completed_date is None:
         raise HTTPException(status_code=400, detail="completed_date is required when status is completed")
 
     new_values = _activity_values(activity)
-    changed_fields = {
-        field: {"old": old_values[field], "new": new_values[field]}
-        for field in AUDIT_FIELDS
-        if old_values[field] != new_values[field]
-    }
-    action = "completed" if activity.status == "completed" and previous_status != "completed" else "cancelled" if activity.status == "cancelled" and previous_status != "cancelled" else "updated"
-
-    db.add(activity)
+    changed_fields = {field: {"old": old_values[field], "new": new_values[field]}
+                      for field in AUDIT_FIELDS if old_values[field] != new_values[field]}
+    action = ("completed" if activity.status == "completed" and previous_status != "completed"
+              else "cancelled" if activity.status == "cancelled" and previous_status != "cancelled"
+              else "updated")
     try:
-        _add_history(db, activity, current_user.user_id, action, old_values=old_values, new_values=changed_fields or new_values)
+        _add_history(db, activity, current_user.user_id, action, old_values=old_values,
+                     new_values=changed_fields or new_values)
         db.commit()
     except Exception:
         db.rollback()
         raise HTTPException(status_code=400, detail="Could not update maintenance activity")
-
     db.refresh(activity)
     return activity
