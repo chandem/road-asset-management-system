@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import {
-  createDefect, createInspection, createMaintenance, getAIDetections, getAIStatus, getDefectGeoJSON, getGPSTrackGeoJSON,
-  getRoadAssetGeoJSON, getRoadGeoJSON, getRoadInspections, getRoadMaintenance, getRoadSectionGeoJSON,
-  getRoadSections, getRoads, runAIDetection, uploadImage,
+  createDefect, createInspection, createMaintenance, getAIDetections, getAIStatus, getDashboardSummary, getDefectGeoJSON, getGPSTrackGeoJSON,
+  getRoadAssetGeoJSON, getRoadGeoJSON, getRoadMaintenance, getRoadSectionGeoJSON,
+  runAIDetection, uploadImage,
 } from "./api";
 import FieldGPS from "./FieldGPS";
 import OfflineInspectionQueue from "./OfflineInspectionQueue";
@@ -36,6 +36,7 @@ function App({ user }) {
   const [aiStatus, setAiStatus] = useState(null);
   const [aiMessage, setAiMessage] = useState("");
   const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+  const [summaryCounts, setSummaryCounts] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [maintenanceRoadId, setMaintenanceRoadId] = useState(""); const [maintenance, setMaintenance] = useState([]);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
@@ -51,22 +52,44 @@ function App({ user }) {
   async function loadDashboard() {
     setLoading(true); setError("");
     try {
-      const [r, rg, gg, sg, ag, dg] = await Promise.all([
-        getRoads(), getRoadGeoJSON(), getGPSTrackGeoJSON(), getRoadSectionGeoJSON(), getRoadAssetGeoJSON(), getDefectGeoJSON(),
+      const soft = (p) => p.catch(() => null);
+      const [summary, rg, gg, dg] = await Promise.all([
+        getDashboardSummary(),
+        soft(getRoadGeoJSON()),
+        soft(getGPSTrackGeoJSON()),
+        soft(getDefectGeoJSON()),
       ]);
-      setRoads(r); setRoadGeoJSON(rg); setGpsGeoJSON(gg); setSectionGeoJSON(sg); setAssetGeoJSON(ag); setDefectGeoJSON(dg);
-      const allSections = []; const allInsp = []; const allMaint = [];
-      for (const road of r) {
+      setRoads(summary.roads || []);
+      setSections(summary.sections || []);
+      setInspections(Array(summary.counts?.inspections || 0).fill(null));
+      setAllMaintenance(Array(summary.counts?.maintenance || 0).fill(null));
+      setRoadGeoJSON(rg);
+      setGpsGeoJSON(gg);
+      setDefectGeoJSON(dg);
+      setSummaryCounts(summary.counts || null);
+
+      setSectionGeoJSON({ type: "FeatureCollection", features: [] });
+      setAssetGeoJSON({ type: "FeatureCollection", features: [] });
+      if (summary.roads?.length) {
         try {
-          const secs = await getRoadSections(road.road_id);
-          allSections.push(...secs.map((s) => ({ ...s, road_id: road.road_id })));
-          for (const sec of secs) {
-            try { const insp = await getRoadInspections(road.road_id, sec.section_id); allInsp.push(...insp); } catch (_) {}
-          }
-          try { const m = await getRoadMaintenance(road.road_id); allMaint.push(...m); } catch (_) {}
-        } catch (_) {}
+          const sectionLayers = await Promise.all(
+            summary.roads.map((r) => soft(getRoadSectionGeoJSON(r.road_id))),
+          );
+          const assetLayers = await Promise.all(
+            summary.roads.map((r) => soft(getRoadAssetGeoJSON(r.road_id))),
+          );
+          setSectionGeoJSON({
+            type: "FeatureCollection",
+            features: sectionLayers.flatMap((g) => g?.features || []),
+          });
+          setAssetGeoJSON({
+            type: "FeatureCollection",
+            features: assetLayers.flatMap((g) => g?.features || []),
+          });
+        } catch (_) {
+          /* map layers optional */
+        }
       }
-      setSections(allSections); setInspections(allInsp); setAllMaintenance(allMaint);
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -231,11 +254,11 @@ function App({ user }) {
   }
 
   const report = useMemo(() => ({
-    roads: roads.length,
-    inspections: inspections.length,
-    maintenance: allMaintenance.length,
-    defects: defectGeoJSON?.features?.length || 0,
-  }), [defectGeoJSON, allMaintenance, roads, inspections]);
+    roads: summaryCounts?.roads ?? roads.length,
+    inspections: summaryCounts?.inspections ?? inspections.length,
+    maintenance: summaryCounts?.maintenance ?? allMaintenance.length,
+    defects: summaryCounts?.defects ?? defectGeoJSON?.features?.length ?? 0,
+  }), [summaryCounts, defectGeoJSON, allMaintenance, roads, inspections]);
 
   const completedCount = maintenance.filter((m) => m.status === "completed").length;
   const estimatedTotal = maintenance.reduce((s, m) => s + (Number(m.estimated_cost) || 0), 0);
@@ -375,7 +398,7 @@ function App({ user }) {
 
         {activeTab === "overview" && (
           <>
-            <SummaryCards loading={loading} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} />
+            <SummaryCards loading={loading} counts={summaryCounts} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} />
             <ReportPanel report={report} onRefresh={loadDashboard} />
             <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
           </>
