@@ -241,20 +241,48 @@ function App() {
   const estimatedTotal = maintenance.reduce((s, m) => s + (Number(m.estimated_cost) || 0), 0);
   const actualTotal = maintenance.reduce((s, m) => s + (Number(m.actual_cost) || 0), 0);
 
-  const tabs = [
-    { id: "overview", label: "Overview" },
-    { id: "map", label: "Map" },
-    { id: "field", label: "Field" },
-    { id: "maintenance", label: "Maintenance" },
-    { id: "planning", label: "Planning" },
-    { id: "condition", label: "Condition" },
-    { id: "analytics", label: "Analytics" },
-    { id: "effectiveness", label: "Effectiveness" },
-    { id: "decision", label: "Decision support" },
-    { id: "workflow", label: "Workflow" },
-    { id: "workorders", label: "Work orders" },
-    { id: "reports", label: "Reports" },
+  const navGroups = [
+    {
+      id: "home",
+      label: "Home",
+      tabs: [
+        { id: "overview", label: "Overview" },
+        { id: "map", label: "Map" },
+      ],
+    },
+    {
+      id: "field",
+      label: "Field",
+      tabs: [
+        { id: "field", label: "Capture" },
+        { id: "workflow", label: "Workflow" },
+      ],
+    },
+    {
+      id: "operations",
+      label: "Operations",
+      tabs: [
+        { id: "maintenance", label: "Activities" },
+        { id: "planning", label: "Planning" },
+        { id: "workorders", label: "Work orders" },
+      ],
+    },
+    {
+      id: "insights",
+      label: "Insights",
+      tabs: [
+        { id: "condition", label: "Condition" },
+        { id: "analytics", label: "Analytics" },
+        { id: "effectiveness", label: "Effectiveness" },
+        { id: "decision", label: "Decision support" },
+        { id: "reports", label: "Reports" },
+      ],
+    },
   ];
+
+  const activeGroup =
+    navGroups.find((g) => g.tabs.some((t) => t.id === activeTab)) || navGroups[0];
+  const groupTabs = activeGroup.tabs;
 
   return (
     <div className="app-shell">
@@ -272,16 +300,38 @@ function App() {
       </header>
 
       <nav className="app-nav" aria-label="Main">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`nav-tab${activeTab === tab.id ? " active" : ""}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <div className="nav-groups" role="tablist" aria-label="Sections">
+          {navGroups.map((group) => (
+            <button
+              key={group.id}
+              type="button"
+              role="tab"
+              aria-selected={activeGroup.id === group.id}
+              className={`nav-group${activeGroup.id === group.id ? " active" : ""}`}
+              onClick={() => {
+                if (activeGroup.id !== group.id) {
+                  setActiveTab(group.tabs[0].id);
+                }
+              }}
+            >
+              {group.label}
+            </button>
+          ))}
+        </div>
+        <div className="nav-tabs" role="tablist" aria-label={activeGroup.label}>
+          {groupTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`nav-tab${activeTab === tab.id ? " active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </nav>
 
       <main className="dashboard">
