@@ -15,6 +15,8 @@ import ReportPanel from "./components/ReportPanel";
 import MaintenanceSection from "./components/MaintenanceSection";
 import PhotoAIPanel from "./components/PhotoAIPanel";
 import InspectionDefectForm from "./components/InspectionDefectForm";
+import Reports from "./Reports";
+import WorkOrderManagement from "./WorkOrderManagement";
 
 function App() {
   const [roads, setRoads] = useState([]); const [roadGeoJSON, setRoadGeoJSON] = useState(null); const [gpsGeoJSON, setGpsGeoJSON] = useState(null);
@@ -238,6 +240,8 @@ function App() {
     { id: "map", label: "Map" },
     { id: "field", label: "Field" },
     { id: "maintenance", label: "Maintenance" },
+    { id: "workorders", label: "Work orders" },
+    { id: "reports", label: "Reports" },
   ];
 
   return (
@@ -308,6 +312,14 @@ function App() {
 
         {activeTab === "maintenance" && (
           <MaintenanceSection roads={roads} sections={sections} maintenanceRoadId={maintenanceRoadId} setMaintenanceRoadId={setMaintenanceRoadId} maintenance={maintenance} maintenanceLoading={maintenanceLoading} maintenanceForm={maintenanceForm} updateMaintenance={updateMaintenance} submitMaintenance={submitMaintenance} loadMaintenance={loadMaintenance} saving={saving} message={message} completedCount={completedCount} estimatedTotal={estimatedTotal} actualTotal={actualTotal} />
+        )}
+
+        {activeTab === "workorders" && (
+          <WorkOrderManagement />
+        )}
+
+        {activeTab === "reports" && (
+          <Reports />
         )}
 
         {showForm && (
