@@ -42,6 +42,7 @@ export async function clearPhotos() { await transaction(PHOTO_STORE, "readwrite"
 
 export async function putInspection(inspection) { await transaction(INSPECTION_STORE, "readwrite", (store) => store.put(inspection)); }
 export async function getInspections() { return (await transaction(INSPECTION_STORE, "readonly", (store) => store.getAll())) || []; }
+export async function getPendingInspections() { return (await getInspections()).filter((item) => !item.synced); }
 export async function deleteInspection(clientId) { await transaction(INSPECTION_STORE, "readwrite", (store) => store.delete(clientId)); }
 
 export async function putInspectionMapping(clientId, inspectionId) {
@@ -54,6 +55,7 @@ export async function getInspectionMapping(clientId) {
 
 export async function putDefect(defect) { await transaction(DEFECT_STORE, "readwrite", (store) => store.put(defect)); }
 export async function getDefects() { return (await transaction(DEFECT_STORE, "readonly", (store) => store.getAll())) || []; }
+export async function getPendingDefects() { return (await getDefects()).filter((item) => !item.synced); }
 export async function deleteDefect(clientId) { await transaction(DEFECT_STORE, "readwrite", (store) => store.delete(clientId)); }
 export async function putDefectMapping(clientId, defectId) {
   await transaction(DEFECT_STORE, "readwrite", (store) => store.put({ client_id: clientId, defect_id: defectId, synced: true }));
