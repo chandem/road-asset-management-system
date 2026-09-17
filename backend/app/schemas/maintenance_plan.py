@@ -35,3 +35,14 @@ class MaintenancePlanResponse(BaseModel):
     end_date: Optional[date] = None
     status: MaintenancePlanStatus
     description: Optional[str] = None
+
+
+class MaintenancePlanSummaryResponse(BaseModel):
+    plan_id: int
+    activity_count: int
+    completed_count: int
+    estimated_cost: float
+    actual_cost: float
+    remaining_budget: Optional[float] = None
+    budget_utilization_percent: Optional[float] = None
+    priority_counts: dict[str, int]
