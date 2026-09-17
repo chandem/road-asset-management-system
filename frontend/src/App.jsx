@@ -17,6 +17,7 @@ import {
   runAIDetection,
   uploadImage,
 } from "./api";
+import FieldGPS from "./FieldGPS";
 import RAMSMap from "./RAMSMap";
 
 function App() {
@@ -262,6 +263,8 @@ function App() {
         </section>
 
         <section className="action-panel"><h2>Field Data Entry</h2><p>Create inspections, defects and field photos.</p><div className="actions"><button onClick={() => openForm("inspection")}>+ New Inspection</button><button onClick={() => openForm("defect")}>+ New Defect</button></div></section>
+
+        <FieldGPS />
 
         <section className="form-panel">
           <div className="form-header"><div><h2>🛠️ Maintenance Management</h2><p>Plan, track and review road maintenance activities and costs.</p></div><button type="button" onClick={() => loadMaintenance()}>Refresh</button></div>
