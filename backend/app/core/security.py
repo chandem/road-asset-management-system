@@ -19,13 +19,21 @@ if len(SECRET_KEY) < 32:
     raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters long")
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+try:
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+except ValueError as exc:
+    raise RuntimeError("ACCESS_TOKEN_EXPIRE_MINUTES must be an integer") from exc
+
+if ACCESS_TOKEN_EXPIRE_MINUTES <= 0:
+    raise RuntimeError("ACCESS_TOKEN_EXPIRE_MINUTES must be greater than zero")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
+    if not 8 <= len(password) <= 72:
+        raise ValueError("Password must be between 8 and 72 characters")
     return pwd_context.hash(password)
 
 
@@ -35,14 +43,26 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_access_token(subject: str, role: str) -> str:
     expires = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": subject, "role": role, "exp": expires}
+    issued_at = datetime.now(timezone.utc)
+    payload = {
+        "sub": subject,
+        "role": role,
+        "iat": issued_at,
+        "exp": expires,
+    }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict:
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError as exc:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        subject = payload.get("sub")
+        if not isinstance(subject, str) or not subject.isdigit() or int(subject) <= 0:
+            raise ValueError("Invalid token subject")
+        if not isinstance(payload.get("role"), str) or not payload["role"]:
+            raise ValueError("Invalid token role")
+        return payload
+    except (JWTError, ValueError, TypeError) as exc:
         raise ValueError("Invalid or expired token") from exc
 
 
@@ -79,6 +99,7 @@ def require_roles(*roles: str) -> Callable:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to perform this action",
             )
+
         return current_user
 
     return dependency
