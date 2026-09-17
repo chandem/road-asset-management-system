@@ -55,6 +55,7 @@ export function unassignMaintenanceFromPlan(planId, maintenanceId) { return requ
 export function getWorkOrders() { return request("/work-orders"); }
 export function getMaintenanceWorkOrders(maintenanceId) { return request(`/maintenance/${maintenanceId}/work-orders`); }
 export function getWorkOrder(workOrderId) { return request(`/work-orders/${workOrderId}`); }
+export function getWorkOrderHistory(workOrderId) { return request(`/work-orders/${workOrderId}/history`); }
 export function createWorkOrder(payload) { return request("/work-orders", { method: "POST", body: JSON.stringify(payload) }); }
 export function updateWorkOrder(workOrderId, payload) { return request(`/work-orders/${workOrderId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
 
