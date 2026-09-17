@@ -189,6 +189,10 @@ Key variables:
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime (default 60) |
 | `VITE_API_BASE_URL` | Frontend → backend API base URL |
 
+## Production deployment
+
+For a public or agency host (TLS, secrets, backups, AI model, hardening), see **[deploy/PRODUCTION.md](deploy/PRODUCTION.md)**.
+
 ## Project Structure
 
 ```text
@@ -206,6 +210,7 @@ Key variables:
 │   └── tests/
 ├── frontend/         # React + Vite UI
 ├── database/         # schema.sql + legacy SQL migrations
+├── deploy/           # nginx, TLS path, production guide
 ├── ai/               # YOLO training scripts
 └── docker-compose.yml
 ```
