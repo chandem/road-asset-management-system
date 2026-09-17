@@ -42,6 +42,10 @@ function popupHandlers() {
   return (feature, layer) => layer.bindPopup(popupContent(feature?.properties));
 }
 
+function featureStyle(weight, dashArray) {
+  return { weight, dashArray, opacity: 0.9 };
+}
+
 function conditionCategory(score) {
   if (!Number.isFinite(score)) return "Not rated";
   if (score >= 85) return "Excellent";
@@ -102,13 +106,9 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     const id = Number(selectedRoad);
     const filter = (data) => data ? ({ ...data, features: data.features.filter((f) => Number(f?.properties?.road_id) === id) }) : null;
     return {
-      roadGeoJSON: filter(roadGeoJSON),
-      gpsGeoJSON: filter(gpsGeoJSON),
-      sectionGeoJSON: filter(sectionGeoJSON),
-      assetGeoJSON: filter(assetGeoJSON),
-      defectGeoJSON: filter(defectGeoJSON),
-      chainageGeoJSON: filter(chainageGeoJSON),
-      maintenanceGeoJSON: filter(maintenanceGeoJSON),
+      roadGeoJSON: filter(roadGeoJSON), gpsGeoJSON: filter(gpsGeoJSON), sectionGeoJSON: filter(sectionGeoJSON),
+      assetGeoJSON: filter(assetGeoJSON), defectGeoJSON: filter(defectGeoJSON),
+      chainageGeoJSON: filter(chainageGeoJSON), maintenanceGeoJSON: filter(maintenanceGeoJSON),
     };
   }, [selectedRoad, roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON, chainageGeoJSON, maintenanceGeoJSON]);
 
@@ -116,9 +116,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     let cancelled = false;
     async function loadSpatialLayers() {
       if (!sectionGeoJSON?.features?.length && !roadIds.length) {
-        setChainageGeoJSON(null);
-        setMaintenanceGeoJSON(null);
-        return;
+        setChainageGeoJSON(null); setMaintenanceGeoJSON(null); return;
       }
       setSpatialLoading(true);
       try {
@@ -129,42 +127,28 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
           Promise.all(sectionIds.map((id) => getChainagePoints(Number(id)).catch(() => []))),
           Promise.all(roadIds.map((id) => getRoadMaintenanceGeoJSON(Number(id)).catch(() => ({ type: "FeatureCollection", features: [] })))),
         ]);
-
         const chainageFeatures = chainageResults.flatMap((points) => points.map((p) => ({
-          type: "Feature",
-          geometry: { type: "Point", coordinates: [Number(p.longitude), Number(p.latitude)] },
-          properties: {
-            ...p,
-            road_id: sectionById.get(Number(p.section_id))?.properties?.road_id,
-          },
+          type: "Feature", geometry: { type: "Point", coordinates: [Number(p.longitude), Number(p.latitude)] },
+          properties: { ...p, road_id: sectionById.get(Number(p.section_id))?.properties?.road_id },
         })));
-
         const maintenanceFeatures = maintenanceResults.flatMap((collection) => collection?.features || []);
-
         if (!cancelled) {
           setChainageGeoJSON({ type: "FeatureCollection", features: chainageFeatures });
           setMaintenanceGeoJSON({ type: "FeatureCollection", features: maintenanceFeatures });
         }
-      } finally {
-        if (!cancelled) setSpatialLoading(false);
-      }
+      } finally { if (!cancelled) setSpatialLoading(false); }
     }
     loadSpatialLayers();
     return () => { cancelled = true; };
   }, [sectionGeoJSON, roadIds]);
 
   const layerDefinitions = [
-    ["roads", "Roads", filtered.roadGeoJSON],
-    ["gps", "GPS Tracks", filtered.gpsGeoJSON],
-    ["sections", "Road Sections", filtered.sectionGeoJSON],
-    ["assets", "Road Assets", filtered.assetGeoJSON],
-    ["defects", "Defects", filtered.defectGeoJSON],
-    ["chainage", "Chainage", filtered.chainageGeoJSON],
+    ["roads", "Roads", filtered.roadGeoJSON], ["gps", "GPS Tracks", filtered.gpsGeoJSON],
+    ["sections", "Road Sections", filtered.sectionGeoJSON], ["assets", "Road Assets", filtered.assetGeoJSON],
+    ["defects", "Defects", filtered.defectGeoJSON], ["chainage", "Chainage", filtered.chainageGeoJSON],
     ["maintenance", "Maintenance", filtered.maintenanceGeoJSON],
   ];
-
   const layers = useMemo(() => layerDefinitions.map(([, , data]) => data), [filtered]);
-
   const roadOptions = (roadGeoJSON?.features || []).map((feature) => ({
     id: feature?.properties?.road_id,
     name: feature?.properties?.road_name || feature?.properties?.road_code || `Road ${feature?.properties?.road_id}`,
@@ -173,55 +157,31 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
   const sectionPopupHandlers = useMemo(() => (feature, layer) => {
     const sectionId = Number(feature?.properties?.section_id);
     const score = Number(feature?.properties?.condition_rating);
-    const defects = (filtered.defectGeoJSON?.features || []).filter(
-      (item) => Number(item?.properties?.section_id) === sectionId,
-    );
-    const maintenance = (filtered.maintenanceGeoJSON?.features || []).filter(
-      (item) => Number(item?.properties?.section_id) === sectionId,
-    );
+    const defects = (filtered.defectGeoJSON?.features || []).filter((item) => Number(item?.properties?.section_id) === sectionId);
+    const maintenance = (filtered.maintenanceGeoJSON?.features || []).filter((item) => Number(item?.properties?.section_id) === sectionId);
     const critical = defects.filter((item) => String(item?.properties?.severity || "").toLowerCase() === "critical").length;
     const high = defects.filter((item) => String(item?.properties?.severity || "").toLowerCase() === "high").length;
     const priority = conditionPriority(Number.isFinite(score) ? score : 100, critical, high);
     const estimated = maintenance.reduce((sum, item) => sum + (Number(item?.properties?.estimated_cost) || 0), 0);
     const actual = maintenance.reduce((sum, item) => sum + (Number(item?.properties?.actual_cost) || 0), 0);
-    const content = `
-      <div class="rams-popup">
-        <strong>${escapeHtml(feature?.properties?.section_code || `Section ${sectionId}`)}</strong>
-        <table>
-          <tr><td><strong>Condition</strong></td><td>${Number.isFinite(score) ? score.toFixed(1) : "Not rated"}</td></tr>
-          <tr><td><strong>Category</strong></td><td>${conditionCategory(score)}</td></tr>
-          <tr><td><strong>Maintenance priority</strong></td><td>${priority}</td></tr>
-          <tr><td><strong>Defects</strong></td><td>${defects.length} (${critical} critical, ${high} high)</td></tr>
-          <tr><td><strong>Maintenance activities</strong></td><td>${maintenance.length}</td></tr>
-          <tr><td><strong>Estimated cost</strong></td><td>${estimated.toLocaleString()}</td></tr>
-          <tr><td><strong>Actual cost</strong></td><td>${actual.toLocaleString()}</td></tr>
-        </table>
-        <small>Decision support is based on recorded condition, defects and maintenance records.</small>
-      </div>`;
-    layer.bindPopup(content);
+    layer.bindPopup(`<div class="rams-popup"><strong>${escapeHtml(feature?.properties?.section_code || `Section ${sectionId}`)}</strong><table>
+      <tr><td><strong>Condition</strong></td><td>${Number.isFinite(score) ? score.toFixed(1) : "Not rated"}</td></tr>
+      <tr><td><strong>Category</strong></td><td>${conditionCategory(score)}</td></tr>
+      <tr><td><strong>Maintenance priority</strong></td><td>${priority}</td></tr>
+      <tr><td><strong>Defects</strong></td><td>${defects.length} (${critical} critical, ${high} high)</td></tr>
+      <tr><td><strong>Maintenance activities</strong></td><td>${maintenance.length}</td></tr>
+      <tr><td><strong>Estimated cost</strong></td><td>${estimated.toLocaleString()}</td></tr>
+      <tr><td><strong>Actual cost</strong></td><td>${actual.toLocaleString()}</td></tr>
+    </table><small>Based on recorded condition, defects and maintenance records.</small></div>`);
   }, [filtered.defectGeoJSON, filtered.maintenanceGeoJSON]);
 
   return (
     <section className="map-panel">
       <div className="panel-heading">
-        <div>
-          <h2>GIS Road Asset & Decision Support Map</h2>
-          <p>{loading || spatialLoading ? "Loading spatial data…" : "Click a road section to review condition, defects, maintenance priority and recorded costs."}</p>
-        </div>
+        <div><h2>GIS Road Asset & Decision Support Map</h2><p>{loading || spatialLoading ? "Loading spatial data…" : "Click a road section to review condition, defects, maintenance priority and recorded costs."}</p></div>
         <div className="layer-controls" aria-label="Map filters and layers">
-          <label>
-            Road
-            <select value={selectedRoad} onChange={(e) => setSelectedRoad(e.target.value)}>
-              <option value="all">All roads</option>
-              {roadOptions.map((road) => <option key={road.id} value={road.id}>{road.name}</option>)}
-            </select>
-          </label>
-          {layerDefinitions.map(([key, label, data]) => (
-            <label key={key} title={`Toggle ${label}`}>
-              <input type="checkbox" checked={visible[key] ?? true} onChange={() => toggleLayer(key)} />
-              {label} ({data?.features?.length ?? 0})
-            </label>
-          ))}
+          <label>Road<select value={selectedRoad} onChange={(e) => setSelectedRoad(e.target.value)}><option value="all">All roads</option>{roadOptions.map((road) => <option key={road.id} value={road.id}>{road.name}</option>)}</select></label>
+          {layerDefinitions.map(([key, label, data]) => <label key={key} title={`Toggle ${label}`}><input type="checkbox" checked={visible[key] ?? true} onChange={() => toggleLayer(key)} />{label} ({data?.features?.length ?? 0})</label>)}
         </div>
       </div>
       <MapContainer center={defaultCenter} zoom={7} className="map">
