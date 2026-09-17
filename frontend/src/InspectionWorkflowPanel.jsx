@@ -3,6 +3,7 @@ import {
   createMaintenance,
   getDefectMaintenance,
   getInspectionWorkflow,
+  getMaintenanceHistory,
   updateMaintenance,
 } from "./api";
 
@@ -37,6 +38,8 @@ export default function InspectionWorkflowPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [maintenanceByDefect, setMaintenanceByDefect] = useState({});
+  const [maintenanceHistoryById, setMaintenanceHistoryById] = useState({});
+  const [openHistoryId, setOpenHistoryId] = useState(null);
   const [openDefect, setOpenDefect] = useState(null);
   const [maintenanceForm, setMaintenanceForm] = useState(emptyMaintenance);
   const [savingMaintenance, setSavingMaintenance] = useState(false);
@@ -51,6 +54,8 @@ export default function InspectionWorkflowPanel() {
     setLoading(true);
     setError("");
     setMaintenanceByDefect({});
+    setMaintenanceHistoryById({});
+    setOpenHistoryId(null);
     setOpenDefect(null);
     setEditingMaintenanceId(null);
     try {
@@ -70,6 +75,23 @@ export default function InspectionWorkflowPanel() {
     } catch (err) {
       setMaintenanceMessage(`Maintenance lookup error: ${err.message}`);
     }
+  }
+
+  async function toggleMaintenanceHistory(maintenanceId) {
+    if (openHistoryId === maintenanceId) {
+      setOpenHistoryId(null);
+      return;
+    }
+    if (!maintenanceHistoryById[maintenanceId]) {
+      try {
+        const history = await getMaintenanceHistory(maintenanceId);
+        setMaintenanceHistoryById((current) => ({ ...current, [maintenanceId]: history }));
+      } catch (err) {
+        setMaintenanceMessage(`History lookup error: ${err.message}`);
+        return;
+      }
+    }
+    setOpenHistoryId(maintenanceId);
   }
 
   function openMaintenanceForm(defect) {
@@ -131,6 +153,7 @@ export default function InspectionWorkflowPanel() {
         description: editForm.description.trim() || null,
       });
       setMaintenanceMessage(`Maintenance #${item.maintenance_id} updated successfully.`);
+      setMaintenanceHistoryById((current) => ({ ...current, [item.maintenance_id]: undefined }));
       closeEditMaintenance();
       await loadDefectMaintenance(defectId);
     } catch (err) {
@@ -150,6 +173,7 @@ export default function InspectionWorkflowPanel() {
         completed_date: item.completed_date || today,
       });
       setMaintenanceMessage(`Maintenance #${item.maintenance_id} marked completed.`);
+      setMaintenanceHistoryById((current) => ({ ...current, [item.maintenance_id]: undefined }));
       await loadDefectMaintenance(defectId);
     } catch (err) {
       setMaintenanceMessage(`Maintenance completion error: ${err.message}`);
@@ -254,6 +278,9 @@ export default function InspectionWorkflowPanel() {
                           <div>Estimated: {item.estimated_cost ?? "—"} · Actual: {item.actual_cost ?? "—"} · Contractor: {item.contractor || "—"}</div>
                           {item.completed_date && <div>Completed: {item.completed_date}</div>}
                           <div style={{ marginTop: 7, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button type="button" onClick={() => toggleMaintenanceHistory(item.maintenance_id)}>
+                              {openHistoryId === item.maintenance_id ? "Hide History" : "History"}
+                            </button>
                             <button type="button" onClick={() => openEditMaintenance(item)}>Edit</button>
                             {item.status !== "completed" && (
                               <button type="button" disabled={savingEdit} onClick={() => markMaintenanceCompleted(item, defect.defect_id)}>
@@ -261,13 +288,31 @@ export default function InspectionWorkflowPanel() {
                               </button>
                             )}
                           </div>
+                          {openHistoryId === item.maintenance_id && maintenanceHistoryById[item.maintenance_id] && (
+                            <div style={{ marginTop: 10, padding: "10px", border: "1px solid #ddd", borderRadius: 8 }}>
+                              <h4>Maintenance History</h4>
+                              {maintenanceHistoryById[item.maintenance_id].length === 0 ? (
+                                <small>No history recorded.</small>
+                              ) : (
+                                <div>
+                                  {maintenanceHistoryById[item.maintenance_id].map((entry) => (
+                                    <div key={entry.history_id} style={{ padding: "8px 0", borderBottom: "1px solid #eee" }}>
+                                      <strong>{entry.action}</strong> · {formatDate(entry.changed_at)} · user #{entry.changed_by ?? "—"}
+                                      {entry.old_values && <pre style={{ margin: "6px 0", whiteSpace: "pre-wrap", fontSize: 12 }}>{JSON.stringify(entry.old_values, null, 2)}</pre>}
+                                      {entry.new_values && <pre style={{ margin: "6px 0", whiteSpace: "pre-wrap", fontSize: 12 }}>{JSON.stringify(entry.new_values, null, 2)}</pre>}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                           {editingMaintenanceId === item.maintenance_id && (
                             <form onSubmit={(event) => saveMaintenanceEdit(event, item, defect.defect_id)} style={{ marginTop: 10, padding: 10, border: "1px solid #ddd", borderRadius: 8 }}>
                               <h4>Edit Maintenance #{item.maintenance_id}</h4>
                               <div className="form-grid">
                                 <label>Activity Type<input value={editForm.activity_type} onChange={(e) => setEditForm((c) => ({ ...c, activity_type: e.target.value }))} required /></label>
                                 <label>Priority<select value={editForm.priority} onChange={(e) => setEditForm((c) => ({ ...c, priority: e.target.value }))}><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label>
-                                <label>Status<select value={editForm.status} onChange={(e) => setEditForm((c) => ({ ...c, status: e.target.value }))}><option>planned</option><option>in_progress</option><option>completed</option><option>cancelled</option></select></label>
+                                <label>Status<select value={editForm.status} onChange={(e) => setEditForm((c) => ({ ...c, status: e.target.value }))}><option>planned</option><option>in progress</option><option>completed</option><option>cancelled</option></select></label>
                                 <label>Planned Date<input type="date" value={editForm.planned_date} onChange={(e) => setEditForm((c) => ({ ...c, planned_date: e.target.value }))} /></label>
                                 <label>Completed Date<input type="date" value={editForm.completed_date} onChange={(e) => setEditForm((c) => ({ ...c, completed_date: e.target.value }))} /></label>
                                 <label>Estimated Cost<input type="number" min="0" step="0.01" value={editForm.estimated_cost} onChange={(e) => setEditForm((c) => ({ ...c, estimated_cost: e.target.value }))} /></label>
@@ -308,22 +353,11 @@ export default function InspectionWorkflowPanel() {
 
             <div className="report-box">
               <h3>Photos</h3>
-              {workflow.images.length === 0 ? <p>No photos linked to this inspection.</p> : workflow.images.map((image) => (
+              {workflow.images.length === 0 ? <p>No photos linked.</p> : workflow.images.map((image) => (
                 <div key={image.image_id} style={{ padding: "8px 0", borderBottom: "1px solid #ddd" }}>
-                  <strong>#{image.image_id} · {image.file_name}</strong>
-                  <div>Defect: {image.defect_id ?? "—"}</div>
-                  <small>GPS: {image.latitude ?? "—"}, {image.longitude ?? "—"} · {formatDate(image.captured_at)}</small>
-                </div>
-              ))}
-            </div>
-
-            <div className="report-box">
-              <h3>🤖 AI Detections</h3>
-              {workflow.ai_detections.length === 0 ? <p>No AI detections recorded for these photos.</p> : workflow.ai_detections.map((detection) => (
-                <div key={detection.detection_id} style={{ padding: "8px 0", borderBottom: "1px solid #ddd" }}>
-                  <strong>{detection.defect_type}</strong>
-                  <div>{(Number(detection.confidence) * 100).toFixed(1)}% confidence · image #{detection.image_id}</div>
-                  <small>{detection.model_name}{detection.model_version ? ` · ${detection.model_version}` : ""}</small>
+                  <strong>Image #{image.image_id}</strong>
+                  <div>{image.filename || "Unnamed image"}</div>
+                  <small>Captured: {formatDate(image.captured_at)} · Location: {image.latitude ?? "—"}, {image.longitude ?? "—"}</small>
                 </div>
               ))}
             </div>
