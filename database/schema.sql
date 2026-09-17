@@ -107,7 +107,8 @@ CREATE TABLE culverts (
     chainage_km NUMERIC(12,3),
     condition_rating NUMERIC(5,2),
     geometry geometry(Point, 4326),
-    description TEXT
+    description TEXT,
+    CHECK (condition_rating IS NULL OR (condition_rating >= 0 AND condition_rating <= 100))
 );
 
 CREATE TABLE inspections (
@@ -138,11 +139,28 @@ CREATE TABLE road_defects (
     detected_by VARCHAR(30) NOT NULL DEFAULT 'manual'
 );
 
+CREATE TABLE maintenance_plans (
+    plan_id BIGSERIAL PRIMARY KEY,
+    plan_year INTEGER NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    budget NUMERIC(14,2),
+    start_date DATE,
+    end_date DATE,
+    status VARCHAR(30) NOT NULL DEFAULT 'draft',
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (plan_year >= 2000 AND plan_year <= 2100),
+    CHECK (budget IS NULL OR budget >= 0),
+    CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date),
+    CHECK (status IN ('draft', 'approved', 'in progress', 'completed', 'cancelled'))
+);
+
 CREATE TABLE maintenance_activities (
     maintenance_id BIGSERIAL PRIMARY KEY,
     road_id BIGINT REFERENCES roads(road_id) ON DELETE SET NULL,
     section_id BIGINT REFERENCES road_sections(section_id) ON DELETE SET NULL,
     source_defect_id BIGINT REFERENCES road_defects(defect_id) ON DELETE SET NULL,
+    plan_id BIGINT REFERENCES maintenance_plans(plan_id) ON DELETE SET NULL,
     activity_type VARCHAR(100) NOT NULL,
     priority VARCHAR(30),
     planned_date DATE,
@@ -211,3 +229,8 @@ CREATE INDEX idx_gps_tracks_geometry ON gps_tracks USING GIST (geometry);
 CREATE INDEX idx_maintenance_source_defect ON maintenance_activities (source_defect_id);
 CREATE INDEX idx_maintenance_history_maintenance ON maintenance_history (maintenance_id, changed_at DESC);
 CREATE INDEX idx_maintenance_history_changed_by ON maintenance_history (changed_by);
+CREATE INDEX idx_maintenance_plans_year ON maintenance_plans (plan_year);
+CREATE INDEX idx_maintenance_plans_status ON maintenance_plans (status);
+CREATE INDEX idx_maintenance_activities_plan ON maintenance_activities (plan_id);
+CREATE UNIQUE INDEX uq_inspections_client_id ON inspections (client_id) WHERE client_id IS NOT NULL;
+CREATE INDEX idx_users_username ON users (username);
