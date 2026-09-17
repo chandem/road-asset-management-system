@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, useMap } from "react-leaflet";
-import { getChainagePoints, getRoadGeoJSON, getRoadSections, getRoads } from "./api";
+import { getChainagePoints, getGPSMatch, getRoadGeoJSON, getRoadSections, getRoads } from "./api";
 
 const DEFAULT_CENTER = [8.0, 39.0];
 const AUTO_MATCH_LIMIT_METERS = 500;
+const MATCH_INTERVAL_MS = 5000;
 
 function Recenter({ position }) {
   const map = useMap();
@@ -73,6 +74,8 @@ export default function FieldGPS() {
   const [sectionId, setSectionId] = useState("");
   const [autoMatch, setAutoMatch] = useState(true);
   const [roadMatch, setRoadMatch] = useState(null);
+  const [gpsMatch, setGpsMatch] = useState(null);
+  const [matchingGPS, setMatchingGPS] = useState(false);
   const [loadingRoads, setLoadingRoads] = useState(true);
   const [loadingSections, setLoadingSections] = useState(false);
   const [loadingChainage, setLoadingChainage] = useState(false);
@@ -139,49 +142,47 @@ export default function FieldGPS() {
   }, [sectionId]);
 
   useEffect(() => {
-    if (!autoMatch || !position || !roadsGeoJSON || !roads.length) return;
+    if (!autoMatch || !position || !roadsGeoJSON || !roads.length) return undefined;
     const match = nearestRoad(position, roadsGeoJSON, roads);
     setRoadMatch(match);
-    if (!match?.roadId || match.distance > AUTO_MATCH_LIMIT_METERS) return;
+    if (!match?.roadId || match.distance > AUTO_MATCH_LIMIT_METERS) return undefined;
     if (String(roadId) !== String(match.roadId)) {
       setRoadId(String(match.roadId));
       setSectionId("");
     }
+    return undefined;
   }, [autoMatch, position, roadsGeoJSON, roads, roadId]);
 
   useEffect(() => {
-    if (!autoMatch || !position || !roadId || !sections.length) return;
+    if (!autoMatch || !position || !roads.length) return undefined;
 
     let cancelled = false;
-    async function matchSection() {
-      try {
-        const results = await Promise.all(
-          sections.map(async (section) => ({
-            section,
-            points: await getChainagePoints(section.section_id),
-          })),
-        );
-        if (cancelled) return;
+    let timer;
 
-        let best = null;
-        for (const result of results) {
-          const nearest = nearestChainagePoint(position, result.points);
-          if (nearest && (!best || nearest.distance < best.distance)) {
-            best = { section: result.section, point: nearest };
-          }
-        }
-        if (best && best.distance <= AUTO_MATCH_LIMIT_METERS) {
-          setSectionId(String(best.section.section_id));
-          setChainagePoints((current) => current.length ? current : [best.point]);
+    async function matchPosition() {
+      setMatchingGPS(true);
+      try {
+        const data = await getGPSMatch(position.latitude, position.longitude, AUTO_MATCH_LIMIT_METERS);
+        if (cancelled) return;
+        setGpsMatch(data);
+        if (data?.matched) {
+          setRoadId(String(data.road_id));
+          setSectionId(String(data.section_id));
         }
       } catch (e) {
-        if (!cancelled) setError(`Could not automatically match section: ${e.message}`);
+        if (!cancelled) setError(`Could not match GPS position: ${e.message}`);
+      } finally {
+        if (!cancelled) setMatchingGPS(false);
       }
     }
 
-    matchSection();
-    return () => { cancelled = true; };
-  }, [autoMatch, position, roadId, sections]);
+    matchPosition();
+    timer = setInterval(matchPosition, MATCH_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [autoMatch, position, roads.length]);
 
   const nearestPoint = useMemo(
     () => nearestChainagePoint(position, chainagePoints),
@@ -228,7 +229,6 @@ export default function FieldGPS() {
     );
   }
 
-  const selectedRoad = roads.find((road) => String(road.road_id) === String(roadId));
   const selectedSection = sections.find((section) => String(section.section_id) === String(sectionId));
 
   return (
@@ -236,7 +236,7 @@ export default function FieldGPS() {
       <div className="form-header">
         <div>
           <h2>📍 Field GPS Capture</h2>
-          <p>Capture GPS and automatically match the position to a road, section and nearest chainage point.</p>
+          <p>Capture GPS and match the position to a road, section and continuous chainage.</p>
         </div>
         <div className="actions">
           <button type="button" onClick={captureOnce}>Capture GPS</button>
@@ -275,12 +275,16 @@ export default function FieldGPS() {
         </label>
       </div>
 
-      {autoMatch && roadMatch?.road && (
+      {autoMatch && gpsMatch?.matched && (
         <div className="info-banner">
-          Auto-matched road: <strong>{roadMatch.road.road_code} — {roadMatch.road.road_name}</strong>
-          {roadMatch.distance != null && ` (${roadMatch.distance.toFixed(1)} m from road reference)`}
-          {selectedSection && ` · Section: ${selectedSection.section_code}`}
+          Auto-matched: <strong>{gpsMatch.road_code} — {gpsMatch.road_name}</strong>
+          {` · ${gpsMatch.section_code}`}
+          {` · Chainage ${Number(gpsMatch.chainage_km).toFixed(3)} km`}
+          {` · ${Number(gpsMatch.distance_to_section_m).toFixed(1)} m from road`}
         </div>
+      )}
+      {autoMatch && !gpsMatch?.matched && position && !matchingGPS && (
+        <div className="info-banner">No road section found within {AUTO_MATCH_LIMIT_METERS} m of the GPS position.</div>
       )}
 
       <div className="field-gps-grid">
@@ -289,9 +293,11 @@ export default function FieldGPS() {
           <div className="card"><span>Longitude</span><strong>{position ? position.longitude.toFixed(6) : "—"}</strong></div>
           <div className="card"><span>Accuracy</span><strong>{position ? `${position.accuracy.toFixed(1)} m` : "—"}</strong></div>
           <div className="card"><span>Elevation</span><strong>{position?.altitude == null ? "—" : `${position.altitude.toFixed(1)} m`}</strong></div>
-          <div className="card"><span>Nearest chainage</span><strong>{nearestPoint ? `${Number(nearestPoint.chainage_km).toFixed(3)} km` : "—"}</strong></div>
-          <div className="card"><span>Distance to chainage point</span><strong>{nearestPoint ? `${nearestPoint.distance.toFixed(1)} m` : "—"}</strong></div>
-          <div className="card"><span>Chainage elevation</span><strong>{nearestPoint?.elevation_m == null ? "—" : `${Number(nearestPoint.elevation_m).toFixed(1)} m`}</strong></div>
+          <div className="card"><span>Matched road</span><strong>{gpsMatch?.matched ? `${gpsMatch.road_code} — ${gpsMatch.road_name}` : matchingGPS ? "Matching…" : "—"}</strong></div>
+          <div className="card"><span>Matched section</span><strong>{gpsMatch?.matched ? gpsMatch.section_code : "—"}</strong></div>
+          <div className="card"><span>Continuous chainage</span><strong>{gpsMatch?.matched ? `${Number(gpsMatch.chainage_km).toFixed(3)} km` : "—"}</strong></div>
+          <div className="card"><span>Distance to road</span><strong>{gpsMatch?.matched ? `${Number(gpsMatch.distance_to_section_m).toFixed(1)} m` : "—"}</strong></div>
+          <div className="card"><span>Nearest stored point</span><strong>{nearestPoint ? `${Number(nearestPoint.chainage_km).toFixed(3)} km` : "—"}</strong></div>
         </div>
 
         <MapContainer center={position ? [position.latitude, position.longitude] : DEFAULT_CENTER} zoom={position ? 15 : 7} className="field-gps-map">
@@ -300,17 +306,29 @@ export default function FieldGPS() {
             <CircleMarker center={[position.latitude, position.longitude]} radius={9} pathOptions={{ fillOpacity: 0.85 }} />
             <Recenter position={position} />
           </>}
+          {gpsMatch?.matched && gpsMatch.projected_point?.coordinates && (
+            <CircleMarker
+              center={[gpsMatch.projected_point.coordinates[1], gpsMatch.projected_point.coordinates[0]]}
+              radius={6}
+              pathOptions={{ fillOpacity: 0.7 }}
+            />
+          )}
           {nearestPoint && (
-            <CircleMarker center={[Number(nearestPoint.latitude), Number(nearestPoint.longitude)]} radius={6} pathOptions={{ fillOpacity: 0.7 }} />
+            <CircleMarker
+              center={[Number(nearestPoint.latitude), Number(nearestPoint.longitude)]}
+              radius={5}
+              pathOptions={{ fillOpacity: 0.55 }}
+            />
           )}
         </MapContainer>
       </div>
 
       {sectionId && <small>
         {loadingChainage
-          ? "Loading chainage points…"
-          : `${chainagePoints.length} chainage point${chainagePoints.length === 1 ? "" : "s"} loaded for ${selectedSection?.section_code || "the selected section"}.`}
+          ? "Loading stored chainage points…"
+          : `${chainagePoints.length} stored chainage point${chainagePoints.length === 1 ? "" : "s"} loaded for ${selectedSection?.section_code || "the selected section"}.`}
       </small>}
+      {gpsMatch?.matched && <small>Continuous chainage is calculated from the GPS position projected onto the road-section geometry.</small>}
       {position && <small>Last GPS fix: {new Date(position.timestamp).toLocaleString()}</small>}
     </section>
   );
