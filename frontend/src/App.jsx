@@ -19,6 +19,11 @@ import {
 } from "./api";
 import FieldGPS from "./FieldGPS";
 import RAMSMap from "./RAMSMap";
+import SummaryCards from "./components/SummaryCards";
+import ReportPanel from "./components/ReportPanel";
+import MaintenanceSection from "./components/MaintenanceSection";
+import PhotoAIPanel from "./components/PhotoAIPanel";
+import InspectionDefectForm from "./components/InspectionDefectForm";
 
 function App() {
   const [roads, setRoads] = useState([]);
@@ -172,9 +177,12 @@ function App() {
     if (!photo.file) { setMessage("Select a road image first."); return; }
     setSaving(true); setMessage(""); setAiResults([]);
     try {
-      const r = await uploadImage({ file: photo.file, inspectionId: photo.inspection_id, defectId: photo.defect_id,
-        capturedAt: photo.captured_at || new Date().toISOString(), latitude: photo.latitude === "" ? null : Number(photo.latitude),
-        longitude: photo.longitude === "" ? null : Number(photo.longitude) });
+      const r = await uploadImage({
+        file: photo.file, inspectionId: photo.inspection_id, defectId: photo.defect_id,
+        capturedAt: photo.captured_at || new Date().toISOString(),
+        latitude: photo.latitude === "" ? null : Number(photo.latitude),
+        longitude: photo.longitude === "" ? null : Number(photo.longitude),
+      });
       setUploadedImageId(r.image_id);
       setMessage(`Photo #${r.image_id} uploaded successfully. You can now run AI detection.`);
       setPhoto({ file: null, inspection_id: "", defect_id: "", latitude: "", longitude: "", captured_at: "" });
@@ -198,7 +206,6 @@ function App() {
     catch (e) { setMessage(`AI results error: ${e.message}`); }
   }
 
-  const selectedMaintenanceSections = sections.filter((s) => String(s.road_id) === String(maintenanceRoadId));
   const estimatedTotal = maintenance.reduce((sum, x) => sum + (Number(x.estimated_cost) || 0), 0);
   const actualTotal = maintenance.reduce((sum, x) => sum + (Number(x.actual_cost) || 0), 0);
   const completedCount = maintenance.filter((x) => String(x.status).toLowerCase() === "completed").length;
@@ -231,72 +238,80 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div><h1>Road Asset Management System</h1><p>RAMS · Road infrastructure management dashboard</p></div>
+        <div>
+          <h1>Road Asset Management System</h1>
+          <p>RAMS · Road infrastructure management dashboard</p>
+        </div>
         <span className="status">API v0.9</span>
       </header>
       <main className="dashboard">
         {error && <div className="error-banner">API connection: {error}</div>}
-        <section className="cards">
-          <div className="card"><span>Roads</span><strong>{loading ? "…" : roads.length}</strong></div>
-          <div className="card"><span>GPS Tracks</span><strong>{loading ? "…" : gpsGeoJSON?.features?.length ?? 0}</strong></div>
-          <div className="card"><span>Sections</span><strong>{loading ? "…" : sectionGeoJSON?.features?.length ?? 0}</strong></div>
-          <div className="card"><span>Assets</span><strong>{loading ? "…" : assetGeoJSON?.features?.length ?? 0}</strong></div>
-          <div className="card"><span>Defects</span><strong>{loading ? "…" : defectGeoJSON?.features?.length ?? 0}</strong></div>
-        </section>
 
-        <section className="report-panel">
-          <div className="panel-heading"><div><h2>📊 Dashboard & Reports</h2><p>Operational overview of road condition, inspections, defects and maintenance.</p></div><button type="button" onClick={loadDashboard}>Refresh Report</button></div>
-          <div className="cards report-cards">
-            <div className="card"><span>Average Section Condition</span><strong>{report.averageCondition == null ? "—" : report.averageCondition.toFixed(1)}/100</strong></div>
-            <div className="card"><span>Inspections</span><strong>{report.inspectionCount}</strong></div>
-            <div className="card"><span>Total Defects</span><strong>{report.defects}</strong></div>
-            <div className="card"><span>Maintenance</span><strong>{report.planned}</strong></div>
-            <div className="card"><span>Completed Maintenance</span><strong>{report.completed}</strong></div>
-            <div className="card"><span>Estimated Cost</span><strong>{report.estimated.toLocaleString()} ETB</strong></div>
-            <div className="card"><span>Actual Cost</span><strong>{report.actual.toLocaleString()} ETB</strong></div>
-          </div>
-          <div className="report-grid">
-            <div className="report-box"><h3>Defects by Severity</h3>{Object.entries(report.severity).map(([key, value]) => <div className="bar-row" key={key}><span>{key}</span><div className="bar"><i style={{ width: `${report.defects ? Math.max(2, (value / report.defects) * 100) : 0}%` }} /></div><strong>{value}</strong></div>)}</div>
-            <div className="report-box"><h3>Defects by Type</h3>{Object.keys(report.types).length === 0 ? <p>No defect records yet.</p> : Object.entries(report.types).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([key, value]) => <div className="bar-row" key={key}><span>{key}</span><div className="bar"><i style={{ width: `${report.defects ? Math.max(2, (value / report.defects) * 100) : 0}%` }} /></div><strong>{value}</strong></div>)}</div>
-          </div>
-          <div className="report-box"><h3>Road Condition Overview</h3>{report.roadCondition.length === 0 ? <p>No roads available.</p> : <div className="table-wrap"><table><thead><tr><th>Road</th><th>Sections</th><th>Average Condition</th><th>Length (km)</th><th>Status</th></tr></thead><tbody>{report.roadCondition.map((r) => <tr key={r.road_id}><td>{r.road_code} · {r.road_name}</td><td>{r.sectionCount}</td><td>{r.condition == null ? "—" : `${r.condition.toFixed(1)}/100`}</td><td>{r.total_length_km ?? "—"}</td><td>{r.status}</td></tr>)}</tbody></table></div>}</div>
-        </section>
+        <SummaryCards
+          loading={loading}
+          roads={roads}
+          gpsGeoJSON={gpsGeoJSON}
+          sectionGeoJSON={sectionGeoJSON}
+          assetGeoJSON={assetGeoJSON}
+          defectGeoJSON={defectGeoJSON}
+        />
 
-        <section className="action-panel"><h2>Field Data Entry</h2><p>Create inspections, defects and field photos.</p><div className="actions"><button onClick={() => openForm("inspection")}>+ New Inspection</button><button onClick={() => openForm("defect")}>+ New Defect</button></div></section>
+        <ReportPanel report={report} onRefresh={loadDashboard} />
+
+        <section className="action-panel">
+          <h2>Field Data Entry</h2>
+          <p>Create inspections, defects and field photos.</p>
+          <div className="actions">
+            <button onClick={() => openForm("inspection")}>+ New Inspection</button>
+            <button onClick={() => openForm("defect")}>+ New Defect</button>
+          </div>
+        </section>
 
         <FieldGPS />
 
-        <section className="form-panel">
-          <div className="form-header"><div><h2>🛠️ Maintenance Management</h2><p>Plan, track and review road maintenance activities and costs.</p></div><button type="button" onClick={() => loadMaintenance()}>Refresh</button></div>
-          <div className="form-grid">
-            <label>Road<select value={maintenanceRoadId} onChange={(e) => setMaintenanceRoadId(e.target.value)}><option value="">Select road</option>{roads.map((r) => <option key={r.road_id} value={r.road_id}>{r.road_code} · {r.road_name}</option>)}</select></label>
-            <div className="card"><span>Activities</span><strong>{maintenanceLoading ? "…" : maintenance.length}</strong></div><div className="card"><span>Completed</span><strong>{completedCount}</strong></div>
-            <div className="card"><span>Estimated Cost</span><strong>{estimatedTotal.toLocaleString()}</strong></div><div className="card"><span>Actual Cost</span><strong>{actualTotal.toLocaleString()}</strong></div>
-          </div>
-          <form onSubmit={submitMaintenance}><h3>New Maintenance Activity</h3><div className="form-grid">
-            <label>Section<select value={maintenanceForm.section_id} onChange={(e) => updateMaintenance("section_id", e.target.value)}><option value="">Whole road</option>{selectedMaintenanceSections.map((s) => <option key={s.section_id} value={s.section_id}>{s.section_code} ({s.start_chainage}–{s.end_chainage} km)</option>)}</select></label>
-            <label>Activity Type<input value={maintenanceForm.activity_type} onChange={(e) => updateMaintenance("activity_type", e.target.value)} placeholder="Routine grading, pothole repair…" required /></label>
-            <label>Priority<select value={maintenanceForm.priority} onChange={(e) => updateMaintenance("priority", e.target.value)}><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label>
-            <label>Status<select value={maintenanceForm.status} onChange={(e) => updateMaintenance("status", e.target.value)}><option>planned</option><option>in progress</option><option>completed</option><option>cancelled</option></select></label>
-            <label>Planned Date<input type="date" value={maintenanceForm.planned_date} onChange={(e) => updateMaintenance("planned_date", e.target.value)} /></label>
-            <label>Completed Date<input type="date" value={maintenanceForm.completed_date} onChange={(e) => updateMaintenance("completed_date", e.target.value)} /></label>
-            <label>Estimated Cost<input type="number" min="0" step="0.01" value={maintenanceForm.estimated_cost} onChange={(e) => updateMaintenance("estimated_cost", e.target.value)} /></label>
-            <label>Actual Cost<input type="number" min="0" step="0.01" value={maintenanceForm.actual_cost} onChange={(e) => updateMaintenance("actual_cost", e.target.value)} /></label>
-            <label>Contractor<input value={maintenanceForm.contractor} onChange={(e) => updateMaintenance("contractor", e.target.value)} /></label><label>Description<textarea value={maintenanceForm.description} onChange={(e) => updateMaintenance("description", e.target.value)} /></label>
-          </div><div className="form-footer"><button type="submit" disabled={saving || !maintenanceRoadId}>{saving ? "Saving…" : "Create Maintenance"}</button>{message && <span>{message}</span>}</div></form>
-          <div className="maintenance-list"><h3>Maintenance History</h3>{maintenanceLoading ? <p>Loading maintenance records…</p> : maintenance.length === 0 ? <p>No maintenance activities recorded for this road.</p> : <div className="table-wrap"><table><thead><tr><th>Activity</th><th>Section</th><th>Priority</th><th>Status</th><th>Planned</th><th>Completed</th><th>Estimated</th><th>Actual</th><th>Contractor</th></tr></thead><tbody>{maintenance.map((m) => { const section = sections.find((s) => s.section_id === m.section_id); return <tr key={m.maintenance_id}><td>{m.activity_type}</td><td>{section?.section_code || m.section_id || "Whole road"}</td><td>{m.priority || "—"}</td><td>{m.status}</td><td>{m.planned_date || "—"}</td><td>{m.completed_date || "—"}</td><td>{m.estimated_cost == null ? "—" : Number(m.estimated_cost).toLocaleString()}</td><td>{m.actual_cost == null ? "—" : Number(m.actual_cost).toLocaleString()}</td><td>{m.contractor || "—"}</td></tr>; })}</tbody></table></div>}</div>
-        </section>
+        <MaintenanceSection
+          roads={roads}
+          sections={sections}
+          maintenanceRoadId={maintenanceRoadId}
+          setMaintenanceRoadId={setMaintenanceRoadId}
+          maintenance={maintenance}
+          maintenanceLoading={maintenanceLoading}
+          maintenanceForm={maintenanceForm}
+          updateMaintenance={updateMaintenance}
+          submitMaintenance={submitMaintenance}
+          loadMaintenance={loadMaintenance}
+          saving={saving}
+          message={message}
+          completedCount={completedCount}
+          estimatedTotal={estimatedTotal}
+          actualTotal={actualTotal}
+        />
 
-        <section className="form-panel"><div className="form-header"><div><h2>📷 Field Photo + AI Inspection</h2><p>Upload a road photo, capture GPS, then run the configured road-defect model.</p></div></div><form onSubmit={submitPhoto}>
-          <label>Road Photo<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(e) => updatePhoto("file", e.target.files?.[0] || null)} required /></label>{photo.file && <div className="photo-preview">Selected: {photo.file.name}</div>}
-          <label>Inspection ID (optional)<input type="number" value={photo.inspection_id} onChange={(e) => updatePhoto("inspection_id", e.target.value)} /></label><label>Defect ID (optional)<input type="number" value={photo.defect_id} onChange={(e) => updatePhoto("defect_id", e.target.value)} /></label>
-          <div className="form-grid"><label>Latitude<input type="number" step="any" value={photo.latitude} onChange={(e) => updatePhoto("latitude", e.target.value)} /></label><label>Longitude<input type="number" step="any" value={photo.longitude} onChange={(e) => updatePhoto("longitude", e.target.value)} /></label></div>
-          <button type="button" onClick={captureGPS}>📍 Capture Current GPS</button><label>Captured At<input type="datetime-local" value={photo.captured_at} onChange={(e) => updatePhoto("captured_at", e.target.value)} /></label>
-          <div className="form-footer"><button type="submit" disabled={saving}>{saving ? "Uploading…" : "Upload Photo"}</button>{message && <span>{message}</span>}</div></form>
-          {uploadedImageId && <div className="ai-panel"><div className="form-header"><div><h3>🤖 AI Defect Detection</h3><p>Image #{uploadedImageId}</p></div><button type="button" onClick={loadExistingDetections}>Refresh Results</button></div><button type="button" onClick={detectPhoto} disabled={aiRunning}>{aiRunning ? "Analyzing…" : "Run AI Detection"}</button>{aiResults.length > 0 && <div className="ai-results"><h4>Detections</h4>{aiResults.map((d) => <div className="ai-result" key={d.detection_id}><strong>{d.defect_type}</strong><span>{(Number(d.confidence) * 100).toFixed(1)}% confidence</span><small>{d.model_name}{d.model_version ? ` · ${d.model_version}` : ""}</small></div>)}</div>}</div>}
-        </section>
+        <PhotoAIPanel
+          photo={photo}
+          updatePhoto={updatePhoto}
+          submitPhoto={submitPhoto}
+          captureGPS={captureGPS}
+          saving={saving}
+          uploadedImageId={uploadedImageId}
+          aiResults={aiResults}
+          aiRunning={aiRunning}
+          detectPhoto={detectPhoto}
+          loadExistingDetections={loadExistingDetections}
+        />
 
-        {showForm && <section className="form-panel"><div className="form-header"><h2>{formType === "inspection" ? "New Road Inspection" : "New Road Defect"}</h2><button type="button" onClick={() => setShowForm(false)}>Close</button></div><form onSubmit={submitForm}>{formType === "inspection" ? <><label>Road Section<select value={form.section_id} onChange={(e) => update("section_id", e.target.value)} required><option value="">Select section</option>{sections.map((s) => <option key={s.section_id} value={s.section_id}>{s.section_code} ({s.start_chainage}–{s.end_chainage} km)</option>)}</select></label><label>Inspection Date<input type="date" value={form.inspection_date} onChange={(e) => update("inspection_date", e.target.value)} required /></label><label>Condition Rating (0–100)<input type="number" min="0" max="100" step="0.01" value={form.condition_rating} onChange={(e) => update("condition_rating", e.target.value)} /></label><label>Weather<input value={form.weather} onChange={(e) => update("weather", e.target.value)} /></label><label>Notes<textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} /></label></> : <><label>Inspection ID<input type="number" value={form.inspection_id} onChange={(e) => update("inspection_id", e.target.value)} required /></label><label>Road Section<select value={form.section_id} onChange={(e) => update("section_id", e.target.value)}><option value="">Use inspection section</option>{sections.map((s) => <option key={s.section_id} value={s.section_id}>{s.section_code}</option>)}</select></label><label>Defect Type<input value={form.defect_type} onChange={(e) => update("defect_type", e.target.value)} required /></label><label>Severity<select value={form.severity} onChange={(e) => update("severity", e.target.value)}><option value="">Select</option><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label><label>Chainage (km)<input type="number" min="0" step="0.001" value={form.chainage_km} onChange={(e) => update("chainage_km", e.target.value)} /></label><label>Length (m)<input type="number" min="0" step="0.01" value={form.length_m} onChange={(e) => update("length_m", e.target.value)} /></label><label>Width (m)<input type="number" min="0" step="0.01" value={form.width_m} onChange={(e) => update("width_m", e.target.value)} /></label><label>Depth (mm)<input type="number" min="0" step="0.1" value={form.depth_mm} onChange={(e) => update("depth_mm", e.target.value)} /></label><label>Detected By<select value={form.detected_by} onChange={(e) => update("detected_by", e.target.value)}><option>manual</option><option>gps</option><option>ai</option></select></label><label>Description<textarea value={form.description} onChange={(e) => update("description", e.target.value)} /></label></>}<div className="form-footer"><button type="submit" disabled={saving}>{saving ? "Saving…" : "Save Record"}</button>{message && <span>{message}</span>}</div></form></section>}
+        {showForm && (
+          <InspectionDefectForm
+            formType={formType}
+            form={form}
+            update={update}
+            sections={sections}
+            submitForm={submitForm}
+            saving={saving}
+            message={message}
+            onClose={() => setShowForm(false)}
+          />
+        )}
 
         <RAMSMap
           roadGeoJSON={roadGeoJSON}
