@@ -86,3 +86,29 @@ def test_dashboard_summary_returns_counts_and_lists():
         assert body["sections"] == []
     finally:
         app.dependency_overrides.clear()
+
+
+def test_dashboard_attention_shape():
+    user = make_user()
+    fake = FakeDB()
+
+    def _user():
+        return user
+
+    def _db():
+        yield fake
+
+    app.dependency_overrides[get_current_user] = _user
+    app.dependency_overrides[get_db] = _db
+    try:
+        response = client.get("/api/v1/dashboard/attention")
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert "overdue_work_orders" in body
+        assert "high_severity_defects" in body
+        assert "overdue_maintenance" in body
+        assert "over_budget_plans" in body
+        assert "totals" in body
+        assert "as_of" in body
+    finally:
+        app.dependency_overrides.clear()
