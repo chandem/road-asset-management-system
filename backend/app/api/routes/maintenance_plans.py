@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.security import AuthenticatedUser, EngineerUser
@@ -12,6 +12,7 @@ from app.schemas.maintenance_activity import MaintenanceActivityResponse
 from app.schemas.maintenance_plan import (
     MaintenancePlanCreate,
     MaintenancePlanResponse,
+    MaintenancePlanSummaryResponse,
     MaintenancePlanUpdate,
 )
 
@@ -48,6 +49,61 @@ def list_plan_activities(plan_id: int, db: DbSession, current_user: Authenticate
         .where(MaintenanceActivity.plan_id == plan_id)
         .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)
     ).all()
+
+
+@router.get(
+    "/maintenance-plans/{plan_id}/summary",
+    response_model=MaintenancePlanSummaryResponse,
+)
+def get_plan_summary(plan_id: int, db: DbSession, current_user: AuthenticatedUser):
+    plan = db.get(MaintenancePlan, plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Maintenance plan not found")
+
+    rows = db.execute(
+        select(
+            MaintenanceActivity.status,
+            MaintenanceActivity.priority,
+            func.count(MaintenanceActivity.maintenance_id),
+            func.coalesce(func.sum(MaintenanceActivity.estimated_cost), 0),
+            func.coalesce(func.sum(MaintenanceActivity.actual_cost), 0),
+        )
+        .where(MaintenanceActivity.plan_id == plan_id)
+        .group_by(MaintenanceActivity.status, MaintenanceActivity.priority)
+    ).all()
+
+    activity_count = 0
+    completed_count = 0
+    estimated_cost = 0.0
+    actual_cost = 0.0
+    priority_counts: dict[str, int] = {}
+
+    for status, priority, count, estimated, actual in rows:
+        activity_count += count
+        if status == "completed":
+            completed_count += count
+        estimated_cost += float(estimated or 0)
+        actual_cost += float(actual or 0)
+        priority_key = priority or "unspecified"
+        priority_counts[priority_key] = priority_counts.get(priority_key, 0) + count
+
+    remaining_budget = None
+    budget_utilization_percent = None
+    if plan.budget is not None:
+        remaining_budget = float(plan.budget) - actual_cost
+        if plan.budget > 0:
+            budget_utilization_percent = round((actual_cost / float(plan.budget)) * 100, 2)
+
+    return MaintenancePlanSummaryResponse(
+        plan_id=plan_id,
+        activity_count=activity_count,
+        completed_count=completed_count,
+        estimated_cost=estimated_cost,
+        actual_cost=actual_cost,
+        remaining_budget=remaining_budget,
+        budget_utilization_percent=budget_utilization_percent,
+        priority_counts=priority_counts,
+    )
 
 
 @router.post("/maintenance-plans", response_model=MaintenancePlanResponse, status_code=201)
