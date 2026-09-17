@@ -156,6 +156,17 @@ CREATE TABLE maintenance_activities (
     CHECK (actual_cost IS NULL OR actual_cost >= 0)
 );
 
+CREATE TABLE maintenance_history (
+    history_id BIGSERIAL PRIMARY KEY,
+    maintenance_id BIGINT NOT NULL REFERENCES maintenance_activities(maintenance_id) ON DELETE CASCADE,
+    changed_by BIGINT REFERENCES users(user_id) ON DELETE SET NULL,
+    action VARCHAR(30) NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    old_values JSONB,
+    new_values JSONB,
+    CHECK (action IN ('created', 'updated', 'completed', 'cancelled'))
+);
+
 CREATE TABLE gps_tracks (
     track_id BIGSERIAL PRIMARY KEY,
     road_id BIGINT REFERENCES roads(road_id) ON DELETE CASCADE,
@@ -198,3 +209,5 @@ CREATE INDEX idx_assets_geometry ON road_assets USING GIST (geometry);
 CREATE INDEX idx_defects_geometry ON road_defects USING GIST (geometry);
 CREATE INDEX idx_gps_tracks_geometry ON gps_tracks USING GIST (geometry);
 CREATE INDEX idx_maintenance_source_defect ON maintenance_activities (source_defect_id);
+CREATE INDEX idx_maintenance_history_maintenance ON maintenance_history (maintenance_id, changed_at DESC);
+CREATE INDEX idx_maintenance_history_changed_by ON maintenance_history (changed_by);
