@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
-import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
   createDefect,
@@ -19,21 +17,7 @@ import {
   runAIDetection,
   uploadImage,
 } from "./api";
-
-const defaultCenter = [8.0, 39.0];
-
-function FitLayers({ layers }) {
-  const map = useMap();
-  useEffect(() => {
-    const layer = L.featureGroup();
-    layers.forEach((d) => {
-      if (d?.features?.length) layer.addLayer(L.geoJSON(d));
-    });
-    const bounds = layer.getBounds();
-    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
-  }, [layers, map]);
-  return null;
-}
+import RAMSMap from "./RAMSMap";
 
 function App() {
   const [roads, setRoads] = useState([]);
@@ -290,7 +274,7 @@ function App() {
             <label>Section<select value={maintenanceForm.section_id} onChange={(e) => updateMaintenance("section_id", e.target.value)}><option value="">Whole road</option>{selectedMaintenanceSections.map((s) => <option key={s.section_id} value={s.section_id}>{s.section_code} ({s.start_chainage}–{s.end_chainage} km)</option>)}</select></label>
             <label>Activity Type<input value={maintenanceForm.activity_type} onChange={(e) => updateMaintenance("activity_type", e.target.value)} placeholder="Routine grading, pothole repair…" required /></label>
             <label>Priority<select value={maintenanceForm.priority} onChange={(e) => updateMaintenance("priority", e.target.value)}><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label>
-            <label>Status<select value={maintenanceForm.status} onChange={(e) => updateMaintenance("status", e.target.value)}><option>planned</option><option>in_progress</option><option>completed</option><option>cancelled</option></select></label>
+            <label>Status<select value={maintenanceForm.status} onChange={(e) => updateMaintenance("status", e.target.value)}><option>planned</option><option>in progress</option><option>completed</option><option>cancelled</option></select></label>
             <label>Planned Date<input type="date" value={maintenanceForm.planned_date} onChange={(e) => updateMaintenance("planned_date", e.target.value)} /></label>
             <label>Completed Date<input type="date" value={maintenanceForm.completed_date} onChange={(e) => updateMaintenance("completed_date", e.target.value)} /></label>
             <label>Estimated Cost<input type="number" min="0" step="0.01" value={maintenanceForm.estimated_cost} onChange={(e) => updateMaintenance("estimated_cost", e.target.value)} /></label>
@@ -311,7 +295,16 @@ function App() {
 
         {showForm && <section className="form-panel"><div className="form-header"><h2>{formType === "inspection" ? "New Road Inspection" : "New Road Defect"}</h2><button type="button" onClick={() => setShowForm(false)}>Close</button></div><form onSubmit={submitForm}>{formType === "inspection" ? <><label>Road Section<select value={form.section_id} onChange={(e) => update("section_id", e.target.value)} required><option value="">Select section</option>{sections.map((s) => <option key={s.section_id} value={s.section_id}>{s.section_code} ({s.start_chainage}–{s.end_chainage} km)</option>)}</select></label><label>Inspection Date<input type="date" value={form.inspection_date} onChange={(e) => update("inspection_date", e.target.value)} required /></label><label>Condition Rating (0–100)<input type="number" min="0" max="100" step="0.01" value={form.condition_rating} onChange={(e) => update("condition_rating", e.target.value)} /></label><label>Weather<input value={form.weather} onChange={(e) => update("weather", e.target.value)} /></label><label>Notes<textarea value={form.notes} onChange={(e) => update("notes", e.target.value)} /></label></> : <><label>Inspection ID<input type="number" value={form.inspection_id} onChange={(e) => update("inspection_id", e.target.value)} required /></label><label>Road Section<select value={form.section_id} onChange={(e) => update("section_id", e.target.value)}><option value="">Use inspection section</option>{sections.map((s) => <option key={s.section_id} value={s.section_id}>{s.section_code}</option>)}</select></label><label>Defect Type<input value={form.defect_type} onChange={(e) => update("defect_type", e.target.value)} required /></label><label>Severity<select value={form.severity} onChange={(e) => update("severity", e.target.value)}><option value="">Select</option><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label><label>Chainage (km)<input type="number" min="0" step="0.001" value={form.chainage_km} onChange={(e) => update("chainage_km", e.target.value)} /></label><label>Length (m)<input type="number" min="0" step="0.01" value={form.length_m} onChange={(e) => update("length_m", e.target.value)} /></label><label>Width (m)<input type="number" min="0" step="0.01" value={form.width_m} onChange={(e) => update("width_m", e.target.value)} /></label><label>Depth (mm)<input type="number" min="0" step="0.1" value={form.depth_mm} onChange={(e) => update("depth_mm", e.target.value)} /></label><label>Detected By<select value={form.detected_by} onChange={(e) => update("detected_by", e.target.value)}><option>manual</option><option>gps</option><option>ai</option></select></label><label>Description<textarea value={form.description} onChange={(e) => update("description", e.target.value)} /></label></>}<div className="form-footer"><button type="submit" disabled={saving}>{saving ? "Saving…" : "Save Record"}</button>{message && <span>{message}</span>}</div></form></section>}
 
-        <section className="map-panel"><div className="panel-heading"><div><h2>GIS Road Asset & Defect Map</h2><p>{loading ? "Loading spatial data…" : "Roads, GPS tracks, sections, assets and defects are available as map layers."}</p></div><div className="layer-controls">{[["roads", "Roads"], ["gps", "GPS"], ["sections", "Sections"], ["assets", "Assets"], ["defects", "Defects"]].map(([k, l]) => <label key={k}><input type="checkbox" checked={visible[k]} onChange={() => toggleLayer(k)} />{l}</label>)}</div></div><MapContainer center={defaultCenter} zoom={7} className="map"><TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />{visible.roads && roadGeoJSON && <GeoJSON data={roadGeoJSON} style={{ weight: 5 }} />}{visible.gps && gpsGeoJSON && <GeoJSON data={gpsGeoJSON} style={{ weight: 3, dashArray: "8 6" }} />}{visible.sections && sectionGeoJSON && <GeoJSON data={sectionGeoJSON} style={{ weight: 4, dashArray: "4 4" }} />}{visible.assets && assetGeoJSON && <GeoJSON data={assetGeoJSON} pointToLayer={(f, ll) => L.circleMarker(ll, { radius: 7, weight: 2 })} />}{visible.defects && defectGeoJSON && <GeoJSON data={defectGeoJSON} pointToLayer={(f, ll) => L.circleMarker(ll, { radius: 8, weight: 2 })} />}<FitLayers layers={[roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON]} /></MapContainer></section>
+        <RAMSMap
+          roadGeoJSON={roadGeoJSON}
+          gpsGeoJSON={gpsGeoJSON}
+          sectionGeoJSON={sectionGeoJSON}
+          assetGeoJSON={assetGeoJSON}
+          defectGeoJSON={defectGeoJSON}
+          visible={visible}
+          toggleLayer={toggleLayer}
+          loading={loading}
+        />
       </main>
     </div>
   );
