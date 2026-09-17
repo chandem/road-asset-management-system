@@ -46,10 +46,16 @@ def create_inspection(
     if db.get(RoadSection, section_id) is None:
         raise HTTPException(status_code=404, detail="Road section not found")
 
+    if payload.client_id:
+        existing = db.scalar(select(Inspection).where(Inspection.client_id == payload.client_id))
+        if existing is not None:
+            return existing
+
     inspection = Inspection(
         section_id=section_id,
         inspection_date=payload.inspection_date,
         inspector_id=payload.inspector_id,
+        client_id=payload.client_id,
         condition_rating=payload.condition_rating,
         weather=payload.weather,
         notes=payload.notes,
@@ -60,6 +66,10 @@ def create_inspection(
         db.commit()
     except Exception:
         db.rollback()
+        if payload.client_id:
+            existing = db.scalar(select(Inspection).where(Inspection.client_id == payload.client_id))
+            if existing is not None:
+                return existing
         raise HTTPException(status_code=400, detail="Could not create inspection")
 
     db.refresh(inspection)
