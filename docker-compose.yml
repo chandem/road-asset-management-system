@@ -30,6 +30,7 @@ services:
       TRUSTED_HOSTS: ${TRUSTED_HOSTS:-localhost}
       AI_MODEL_PATH: ${AI_MODEL_PATH:-models/road_defect.pt}
       AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-0.25}
+      AI_STUB_MODE: ${AI_STUB_MODE:-true}
     expose:
       - "8000"
     volumes:
@@ -61,10 +62,8 @@ services:
     restart: unless-stopped
     ports:
       - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
     volumes:
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./deploy/tls:/etc/nginx/tls:ro
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - frontend
       - backend
