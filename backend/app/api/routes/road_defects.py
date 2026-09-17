@@ -90,6 +90,11 @@ def create_defect(
     if inspection is None:
         raise HTTPException(status_code=404, detail="Inspection not found")
 
+    if payload.client_id:
+        existing = db.scalar(select(RoadDefect).where(RoadDefect.client_id == payload.client_id))
+        if existing is not None:
+            return existing
+
     section_id = payload.section_id or inspection.section_id
     if section_id is not None:
         section = db.get(RoadSection, section_id)
@@ -108,6 +113,7 @@ def create_defect(
     defect = RoadDefect(
         inspection_id=inspection_id,
         section_id=section_id,
+        client_id=payload.client_id,
         defect_type=payload.defect_type,
         severity=payload.severity,
         chainage_km=payload.chainage_km,
@@ -124,6 +130,10 @@ def create_defect(
         db.commit()
     except Exception:
         db.rollback()
+        if payload.client_id:
+            existing = db.scalar(select(RoadDefect).where(RoadDefect.client_id == payload.client_id))
+            if existing is not None:
+                return existing
         raise HTTPException(status_code=400, detail="Could not create road defect")
 
     db.refresh(defect)
