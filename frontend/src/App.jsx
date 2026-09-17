@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import {
-  createDefect, createInspection, createMaintenance, getAIDetections, getDefectGeoJSON, getGPSTrackGeoJSON,
+  createDefect, createInspection, createMaintenance, getAIDetections, getAIStatus, getDefectGeoJSON, getGPSTrackGeoJSON,
   getRoadAssetGeoJSON, getRoadGeoJSON, getRoadInspections, getRoadMaintenance, getRoadSectionGeoJSON,
   getRoadSections, getRoads, runAIDetection, uploadImage,
 } from "./api";
@@ -25,6 +25,8 @@ function App() {
   const [form, setForm] = useState({ section_id: "", inspection_date: new Date().toISOString().slice(0, 10), condition_rating: "", weather: "", notes: "", inspection_id: "", defect_type: "", severity: "", chainage_km: "", length_m: "", width_m: "", depth_mm: "", description: "", detected_by: "manual" });
   const [photo, setPhoto] = useState({ file: null, inspection_id: "", defect_id: "", latitude: "", longitude: "", captured_at: "" });
   const [uploadedImageId, setUploadedImageId] = useState(null); const [aiResults, setAiResults] = useState([]); const [aiRunning, setAiRunning] = useState(false);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [aiMessage, setAiMessage] = useState("");
   const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [maintenanceRoadId, setMaintenanceRoadId] = useState(""); const [maintenance, setMaintenance] = useState([]);
@@ -66,6 +68,26 @@ function App() {
 
   useEffect(() => { loadDashboard(); }, []);
 
+  useEffect(() => {
+    if (activeTab !== "field") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await getAIStatus();
+        if (!cancelled) setAiStatus(status);
+      } catch (e) {
+        if (!cancelled) {
+          setAiStatus({
+            ready: false,
+            stub_mode: false,
+            message: e.message || "Could not load AI status",
+          });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab]);
+
   async function loadMaintenance(roadId) {
     if (!roadId) { setMaintenance([]); return; }
     setMaintenanceLoading(true);
@@ -92,9 +114,11 @@ function App() {
         });
         setMessage("Inspection saved.");
       } else {
-        await createDefect({
+        if (!form.inspection_id) {
+          throw new Error("Inspection ID is required to create a defect");
+        }
+        await createDefect(Number(form.inspection_id), {
           section_id: form.section_id ? Number(form.section_id) : null,
-          inspection_id: form.inspection_id ? Number(form.inspection_id) : null,
           defect_type: form.defect_type, severity: form.severity || null,
           chainage_km: form.chainage_km ? Number(form.chainage_km) : null,
           length_m: form.length_m ? Number(form.length_m) : null,
@@ -137,9 +161,13 @@ function App() {
     e.preventDefault(); if (!photo.file) return;
     setSaving(true); setMessage("");
     try {
-      const img = await uploadImage(photo.file, {
-        inspection_id: photo.inspection_id || null, defect_id: photo.defect_id || null,
-        latitude: photo.latitude || null, longitude: photo.longitude || null, captured_at: photo.captured_at || null,
+      const img = await uploadImage({
+        file: photo.file,
+        inspectionId: photo.inspection_id || null,
+        defectId: photo.defect_id || null,
+        latitude: photo.latitude || null,
+        longitude: photo.longitude || null,
+        capturedAt: photo.captured_at || null,
       });
       setUploadedImageId(img.image_id); setMessage(`Photo uploaded (id ${img.image_id}).`);
     } catch (err) { setMessage(err.message || String(err)); }
@@ -149,11 +177,25 @@ function App() {
   async function detectPhoto() {
     if (!uploadedImageId) return;
     setAiRunning(true);
+    setAiMessage("");
     try {
       const results = await runAIDetection(uploadedImageId);
-      setAiResults(Array.isArray(results) ? results : results?.detections || []);
-    } catch (err) { setMessage(err.message || String(err)); }
-    finally { setAiRunning(false); }
+      const list = Array.isArray(results) ? results : results?.detections || [];
+      setAiResults(list);
+      if (list.length === 0) {
+        setAiMessage(
+          aiStatus?.stub_mode
+            ? "Stub mode: no detections returned (model not loaded)."
+            : "No defects detected above the confidence threshold.",
+        );
+      } else {
+        setAiMessage(`Stored ${list.length} detection(s).`);
+      }
+    } catch (err) {
+      setAiMessage(err.message || String(err));
+    } finally {
+      setAiRunning(false);
+    }
   }
 
   async function loadExistingDetections() {
@@ -260,7 +302,7 @@ function App() {
             <OfflineDefectQueue sections={sections} />
             <OfflinePhotoQueue />
             <FieldGPS />
-            <PhotoAIPanel photo={photo} updatePhoto={updatePhoto} submitPhoto={submitPhoto} captureGPS={captureGPS} saving={saving} uploadedImageId={uploadedImageId} aiResults={aiResults} aiRunning={aiRunning} detectPhoto={detectPhoto} loadExistingDetections={loadExistingDetections} />
+            <PhotoAIPanel photo={photo} updatePhoto={updatePhoto} submitPhoto={submitPhoto} captureGPS={captureGPS} saving={saving} uploadedImageId={uploadedImageId} aiResults={aiResults} aiRunning={aiRunning} detectPhoto={detectPhoto} loadExistingDetections={loadExistingDetections} aiStatus={aiStatus} aiMessage={aiMessage} />
           </>
         )}
 
