@@ -1,8 +1,8 @@
 import { createInspection, uploadImage } from "./api";
+import { getInspectionMapping, getPhotos, putInspectionMapping, deletePhoto } from "./offlineDb";
 
 const INSPECTION_QUEUE_KEY = "rams.offline.inspection.queue";
-const PHOTO_QUEUE_KEY = "rams.offline.photo.queue";
-const INSPECTION_MAP_KEY = "rams.offline.inspection.map";
+const LEGACY_PHOTO_QUEUE_KEY = "rams.offline.photo.queue";
 let activeSync = null;
 
 function readQueue(key) {
@@ -18,19 +18,6 @@ function writeQueue(key, queue) {
   localStorage.setItem(key, JSON.stringify(queue));
 }
 
-function readInspectionMap() {
-  try {
-    const value = localStorage.getItem(INSPECTION_MAP_KEY);
-    return value ? JSON.parse(value) : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeInspectionMap(map) {
-  localStorage.setItem(INSPECTION_MAP_KEY, JSON.stringify(map));
-}
-
 function dataUrlToFile(dataUrl, fileName, mimeType) {
   const [header, body] = dataUrl.split(",");
   const binary = atob(body);
@@ -40,21 +27,21 @@ function dataUrlToFile(dataUrl, fileName, mimeType) {
   return new File([bytes], fileName || "road-photo.jpg", { type: detectedMime });
 }
 
-export function syncOfflineQueues() {
+export async function syncOfflineQueues() {
   if (activeSync) return activeSync;
   if (!navigator.onLine) {
-    return Promise.resolve({
+    const photos = await getPhotos().catch(() => []);
+    return {
       inspections: 0,
       photos: 0,
       remainingInspections: readQueue(INSPECTION_QUEUE_KEY).length,
-      remainingPhotos: readQueue(PHOTO_QUEUE_KEY).length,
-    });
+      remainingPhotos: photos.length,
+    };
   }
 
   activeSync = (async () => {
     const inspections = readQueue(INSPECTION_QUEUE_KEY);
-    const photos = readQueue(PHOTO_QUEUE_KEY);
-    const inspectionMap = readInspectionMap();
+    const photos = await getPhotos();
     const failedInspections = [];
     let syncedInspections = 0;
 
@@ -69,20 +56,19 @@ export function syncOfflineQueues() {
           weather: item.weather,
           notes: item.notes,
         });
-        inspectionMap[clientId] = result.inspection_id;
+        await putInspectionMapping(clientId, result.inspection_id);
         syncedInspections += 1;
       } catch {
         failedInspections.push({ ...item, client_id: clientId });
       }
     }
     writeQueue(INSPECTION_QUEUE_KEY, failedInspections);
-    writeInspectionMap(inspectionMap);
 
     const failedPhotos = [];
     let syncedPhotos = 0;
     for (const item of photos) {
       const resolvedInspectionId = item.inspection_client_id
-        ? inspectionMap[item.inspection_client_id]
+        ? await getInspectionMapping(item.inspection_client_id)
         : item.inspection_id;
 
       if (item.inspection_client_id && !resolvedInspectionId) {
@@ -91,7 +77,9 @@ export function syncOfflineQueues() {
       }
 
       try {
-        const file = dataUrlToFile(item.data_url, item.file_name, item.mime_type);
+        const file = item.file instanceof Blob
+          ? new File([item.file], item.file_name || "road-photo.jpg", { type: item.mime_type || item.file.type })
+          : dataUrlToFile(item.data_url, item.file_name, item.mime_type);
         await uploadImage({
           file,
           inspectionId: resolvedInspectionId || null,
@@ -100,12 +88,12 @@ export function syncOfflineQueues() {
           latitude: item.latitude,
           longitude: item.longitude,
         });
+        await deletePhoto(item.id);
         syncedPhotos += 1;
       } catch {
         failedPhotos.push(item);
       }
     }
-    writeQueue(PHOTO_QUEUE_KEY, failedPhotos);
 
     const result = {
       inspections: syncedInspections,
@@ -120,4 +108,17 @@ export function syncOfflineQueues() {
   });
 
   return activeSync;
+}
+
+export function readLegacyPhotoQueue() {
+  try {
+    const value = localStorage.getItem(LEGACY_PHOTO_QUEUE_KEY);
+    return value ? JSON.parse(value) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function clearLegacyPhotoQueue() {
+  localStorage.removeItem(LEGACY_PHOTO_QUEUE_KEY);
 }
