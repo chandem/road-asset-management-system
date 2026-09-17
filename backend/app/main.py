@@ -83,4 +83,4 @@ app.include_router(auth_router, prefix="/api/v1")
 
 @app.get("/health", tags=["System"])
 def health_check():
-    return {"status": "ok", "service": settings.app_name}
+    return {"status": "ok", "service": "rams-api"}
