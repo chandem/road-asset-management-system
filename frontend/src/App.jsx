@@ -23,6 +23,7 @@ import MaintenanceAnalytics from "./MaintenanceAnalytics";
 import MaintenanceEffectiveness from "./MaintenanceEffectiveness";
 import MaintenanceDecisionSupport from "./MaintenanceDecisionSupport";
 import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
+import { canAccessTab, filterNavGroups, normalizeRole } from "./roles";
 
 function App({ user }) {
   const [roads, setRoads] = useState([]); const [roadGeoJSON, setRoadGeoJSON] = useState(null); const [gpsGeoJSON, setGpsGeoJSON] = useState(null);
@@ -264,69 +265,9 @@ function App({ user }) {
   const estimatedTotal = maintenance.reduce((s, m) => s + (Number(m.estimated_cost) || 0), 0);
   const actualTotal = maintenance.reduce((s, m) => s + (Number(m.actual_cost) || 0), 0);
 
-  const role = String(user?.role || "inspector").toLowerCase();
+  const role = normalizeRole(user?.role);
 
-  const TAB_ROLES = {
-    overview: ["admin", "engineer", "inspector", "field_staff"],
-    map: ["admin", "engineer", "inspector", "field_staff"],
-    field: ["admin", "engineer", "inspector", "field_staff"],
-    workflow: ["admin", "engineer", "inspector", "field_staff"],
-    maintenance: ["admin", "engineer"],
-    planning: ["admin", "engineer"],
-    workorders: ["admin", "engineer"],
-    condition: ["admin", "engineer", "inspector"],
-    analytics: ["admin", "engineer"],
-    effectiveness: ["admin", "engineer"],
-    decision: ["admin", "engineer"],
-    reports: ["admin", "engineer"],
-  };
-
-  function canAccessTab(tabId) {
-    return (TAB_ROLES[tabId] || ["admin"]).includes(role);
-  }
-
-  const allNavGroups = [
-    {
-      id: "home",
-      label: "Home",
-      tabs: [
-        { id: "overview", label: "Overview" },
-        { id: "map", label: "Map" },
-      ],
-    },
-    {
-      id: "field",
-      label: "Field",
-      tabs: [
-        { id: "field", label: "Capture" },
-        { id: "workflow", label: "Workflow" },
-      ],
-    },
-    {
-      id: "operations",
-      label: "Operations",
-      tabs: [
-        { id: "maintenance", label: "Activities" },
-        { id: "planning", label: "Planning" },
-        { id: "workorders", label: "Work orders" },
-      ],
-    },
-    {
-      id: "insights",
-      label: "Insights",
-      tabs: [
-        { id: "condition", label: "Condition" },
-        { id: "analytics", label: "Analytics" },
-        { id: "effectiveness", label: "Effectiveness" },
-        { id: "decision", label: "Decision support" },
-        { id: "reports", label: "Reports" },
-      ],
-    },
-  ];
-
-  const navGroups = allNavGroups
-    .map((group) => ({ ...group, tabs: group.tabs.filter((t) => canAccessTab(t.id)) }))
-    .filter((group) => group.tabs.length > 0);
+  const navGroups = filterNavGroups(role);
 
   const activeGroup =
     navGroups.find((g) => g.tabs.some((t) => t.id === activeTab)) ||
@@ -334,7 +275,7 @@ function App({ user }) {
   const groupTabs = activeGroup.tabs;
 
   useEffect(() => {
-    if (!canAccessTab(activeTab) && groupTabs[0]) {
+    if (!canAccessTab(activeTab, role) && groupTabs[0]) {
       setActiveTab(groupTabs[0].id);
     }
   }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
