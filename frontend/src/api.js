@@ -58,6 +58,9 @@ export function getDefectReport(params = "") { return request(`/reports/defects$
 export function getCostReport(params = "") { return request(`/reports/costs${params}`); }
 export function getSectionConditionAssessment(sectionId) { return request(`/sections/${sectionId}/condition-assessment`); }
 export function getRoadConditionAssessment(roadId) { return request(`/roads/${roadId}/condition-assessment`); }
+export function createMaintenanceFromConditionAssessment(sectionId) {
+  return request(`/sections/${sectionId}/condition-assessment/maintenance`, { method: "POST" });
+}
 
 export function createInspection(sectionId, payload) { return request(`/sections/${sectionId}/inspections`, { method: "POST", body: JSON.stringify(payload) }); }
 export function createDefect(inspectionId, payload) { return request(`/inspections/${inspectionId}/defects`, { method: "POST", body: JSON.stringify(payload) }); }
