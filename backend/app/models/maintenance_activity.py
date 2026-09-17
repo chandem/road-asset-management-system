@@ -18,6 +18,9 @@ class MaintenanceActivity(Base):
     section_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("rams.road_sections.section_id", ondelete="SET NULL")
     )
+    plan_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("rams.maintenance_plans.plan_id", ondelete="SET NULL")
+    )
     source_defect_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("rams.road_defects.defect_id", ondelete="SET NULL")
     )
