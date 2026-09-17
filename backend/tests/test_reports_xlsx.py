@@ -38,6 +38,9 @@ class FakeDB:
             def all(self_inner):
                 return []
 
+            def __iter__(self_inner):
+                return iter(self_inner.all())
+
         return _Result()
 
 
