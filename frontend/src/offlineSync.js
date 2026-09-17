@@ -1,10 +1,8 @@
 import { createDefect, createInspection, uploadImage } from "./api";
 import {
-  deleteDefect,
-  deleteInspection,
   getDefectMapping,
-  getDefects,
-  getInspectionMapping,
+  getPendingDefects,
+  getPendingInspections,
   getInspections,
   getPhotos,
   putDefectMapping,
@@ -26,28 +24,34 @@ function readLegacyQueue(key) {
   } catch { return []; }
 }
 
+function fallbackClientId(prefix, item, index) {
+  return item.client_id || item.id || `${prefix}-${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`;
+}
+
 async function migrateLegacyInspections() {
   const legacy = readLegacyQueue(LEGACY_INSPECTION_QUEUE_KEY);
-  if (!legacy.length) return;
-  for (const item of legacy) {
-    const clientId = item.client_id || item.id || `${Date.now()}-${item.section_id}`;
-    await putInspection({ ...item, client_id: clientId, synced: false });
+  if (!Array.isArray(legacy) || !legacy.length) return;
+  for (const [index, item] of legacy.entries()) {
+    await putInspection({ ...item, client_id: fallbackClientId("inspection", item, index), synced: false });
   }
   localStorage.removeItem(LEGACY_INSPECTION_QUEUE_KEY);
 }
 
 async function migrateLegacyDefects() {
   const legacy = readLegacyQueue(LEGACY_DEFECT_QUEUE_KEY);
-  if (!legacy.length) return;
-  for (const item of legacy) {
-    const clientId = item.client_id || item.id || `${Date.now()}-${item.inspection_client_id || item.inspection_id}`;
-    await putDefect({ ...item, client_id: clientId, synced: false });
+  if (!Array.isArray(legacy) || !legacy.length) return;
+  for (const [index, item] of legacy.entries()) {
+    await putDefect({ ...item, client_id: fallbackClientId("defect", item, index), synced: false });
   }
   localStorage.removeItem(LEGACY_DEFECT_QUEUE_KEY);
 }
 
 function dataUrlToFile(dataUrl, fileName, mimeType) {
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) {
+    throw new Error("Offline photo is missing valid image data");
+  }
   const [header, body] = dataUrl.split(",");
+  if (!body) throw new Error("Offline photo data is incomplete");
   const binary = atob(body);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
@@ -58,15 +62,15 @@ function dataUrlToFile(dataUrl, fileName, mimeType) {
 export async function syncOfflineQueues() {
   if (activeSync) return activeSync;
   if (!navigator.onLine) {
-    const inspections = await getInspections().catch(() => []);
-    const defects = await getDefects().catch(() => []);
+    const inspections = await getPendingInspections().catch(() => []);
+    const defects = await getPendingDefects().catch(() => []);
     const photos = await getPhotos().catch(() => []);
     return {
       inspections: 0,
       defects: 0,
       photos: 0,
-      remainingInspections: inspections.filter((x) => !x.synced).length,
-      remainingDefects: defects.filter((x) => !x.synced).length,
+      remainingInspections: inspections.length,
+      remainingDefects: defects.length,
       remainingPhotos: photos.length,
     };
   }
@@ -75,7 +79,7 @@ export async function syncOfflineQueues() {
     await migrateLegacyInspections();
     await migrateLegacyDefects();
 
-    const inspections = (await getInspections()).filter((item) => !item.synced);
+    const inspections = await getPendingInspections();
     let syncedInspections = 0;
     for (const item of inspections) {
       try {
@@ -92,15 +96,19 @@ export async function syncOfflineQueues() {
       } catch { /* Keep the record for the next retry. */ }
     }
 
-    const defects = (await getDefects()).filter((item) => !item.synced);
+    const defects = await getPendingDefects();
     let syncedDefects = 0;
     for (const item of defects) {
       const inspectionId = item.inspection_client_id
-        ? await getInspectionMapping(item.inspection_client_id)
+        ? await getInspections().then((items) => items.find((x) => x.client_id === item.inspection_client_id)?.inspection_id ?? null)
         : item.inspection_id;
-      if (!inspectionId) continue;
+      const resolvedInspectionId = item.inspection_client_id
+        ? (await import("./offlineDb")).getInspectionMapping(item.inspection_client_id)
+        : Promise.resolve(inspectionId);
+      const parentInspectionId = await resolvedInspectionId;
+      if (!parentInspectionId) continue;
       try {
-        const result = await createDefect(inspectionId, {
+        const result = await createDefect(parentInspectionId, {
           section_id: item.section_id ?? null,
           client_id: item.client_id,
           defect_type: item.defect_type,
@@ -123,16 +131,17 @@ export async function syncOfflineQueues() {
     let syncedPhotos = 0;
     for (const item of photos) {
       const resolvedInspectionId = item.inspection_client_id
-        ? await getInspectionMapping(item.inspection_client_id)
+        ? await (await import("./offlineDb")).getInspectionMapping(item.inspection_client_id)
         : item.inspection_id;
       const resolvedDefectId = item.defect_client_id
         ? await getDefectMapping(item.defect_client_id)
         : item.defect_id;
       if (item.inspection_client_id && !resolvedInspectionId) { failedPhotos.push(item); continue; }
       if (item.defect_client_id && !resolvedDefectId) { failedPhotos.push(item); continue; }
+      if (!item.file && !item.data_url) { failedPhotos.push(item); continue; }
       try {
         const file = item.file instanceof Blob
-          ? new File([item.file], item.file_name || "road-photo.jpg", { type: item.mime_type || item.file.type })
+          ? new File([item.file], item.file_name || "road-photo.jpg", { type: item.mime_type || item.file.type || "image/jpeg" })
           : dataUrlToFile(item.data_url, item.file_name, item.mime_type);
         await uploadImage({
           file,
@@ -147,8 +156,8 @@ export async function syncOfflineQueues() {
       } catch { failedPhotos.push(item); }
     }
 
-    const remainingInspections = (await getInspections()).filter((item) => !item.synced);
-    const remainingDefects = (await getDefects()).filter((item) => !item.synced);
+    const remainingInspections = await getPendingInspections();
+    const remainingDefects = await getPendingDefects();
     const result = {
       inspections: syncedInspections,
       defects: syncedDefects,
