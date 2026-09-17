@@ -41,6 +41,26 @@ export function getMaintenanceHistory(maintenanceId) { return request(`/maintena
 export function getDefectMaintenance(defectId) { return request(`/defects/${defectId}/maintenance`); }
 export function createMaintenance(roadId, payload) { return request(`/roads/${roadId}/maintenance`, { method: "POST", body: JSON.stringify(payload) }); }
 export function updateMaintenance(maintenanceId, payload) { return request(`/maintenance/${maintenanceId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
+
+export function getMaintenancePlans() { return request("/maintenance-plans"); }
+export function getMaintenancePlan(planId) { return request(`/maintenance-plans/${planId}`); }
+export function getMaintenancePlanActivities(planId) { return request(`/maintenance-plans/${planId}/activities`); }
+export function createMaintenancePlan(payload) {
+  return request("/maintenance-plans", { method: "POST", body: JSON.stringify(payload) });
+}
+export function updateMaintenancePlan(planId, payload) {
+  return request(`/maintenance-plans/${planId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+export function updateMaintenancePlanStatus(planId, status) {
+  return request(`/maintenance-plans/${planId}/status?status=${encodeURIComponent(status)}`, { method: "PATCH" });
+}
+export function assignMaintenanceToPlan(planId, maintenanceId) {
+  return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "POST" });
+}
+export function unassignMaintenanceFromPlan(planId, maintenanceId) {
+  return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "DELETE" });
+}
+
 export function createInspection(sectionId, payload) { return request(`/sections/${sectionId}/inspections`, { method: "POST", body: JSON.stringify(payload) }); }
 export function createDefect(inspectionId, payload) { return request(`/inspections/${inspectionId}/defects`, { method: "POST", body: JSON.stringify(payload) }); }
 export function createGPSTrack(roadId, payload) { return request(`/roads/${roadId}/gps-tracks`, { method: "POST", body: JSON.stringify(payload) }); }
