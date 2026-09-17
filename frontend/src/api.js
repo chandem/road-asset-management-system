@@ -24,11 +24,7 @@ export function getRoads() { return request("/roads"); }
 export function getRoadGeoJSON() { return request("/roads/geojson"); }
 export function getGPSTrackGeoJSON() { return request("/gps-tracks/geojson"); }
 export function getGPSMatch(latitude, longitude, maxDistanceM = 100) {
-  const params = new URLSearchParams({
-    latitude: String(latitude),
-    longitude: String(longitude),
-    max_distance_m: String(maxDistanceM),
-  });
+  const params = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), max_distance_m: String(maxDistanceM) });
   return request(`/gps/match?${params.toString()}`);
 }
 export function getRoadSectionGeoJSON(roadId) { return request(`/roads/${roadId}/sections/geojson`); }
@@ -43,18 +39,11 @@ export function getRoadMaintenance(roadId) { return request(`/roads/${roadId}/ma
 export function getMaintenance(maintenanceId) { return request(`/maintenance/${maintenanceId}`); }
 export function getMaintenanceHistory(maintenanceId) { return request(`/maintenance/${maintenanceId}/history`); }
 export function getDefectMaintenance(defectId) { return request(`/defects/${defectId}/maintenance`); }
-export function createMaintenance(roadId, payload) {
-  return request(`/roads/${roadId}/maintenance`, { method: "POST", body: JSON.stringify(payload) });
-}
-export function updateMaintenance(maintenanceId, payload) {
-  return request(`/maintenance/${maintenanceId}`, { method: "PATCH", body: JSON.stringify(payload) });
-}
-export function createInspection(sectionId, payload) {
-  return request(`/sections/${sectionId}/inspections`, { method: "POST", body: JSON.stringify(payload) });
-}
-export function createDefect(inspectionId, payload) {
-  return request(`/inspections/${inspectionId}/defects`, { method: "POST", body: JSON.stringify(payload) });
-}
+export function createMaintenance(roadId, payload) { return request(`/roads/${roadId}/maintenance`, { method: "POST", body: JSON.stringify(payload) }); }
+export function updateMaintenance(maintenanceId, payload) { return request(`/maintenance/${maintenanceId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
+export function createInspection(sectionId, payload) { return request(`/sections/${sectionId}/inspections`, { method: "POST", body: JSON.stringify(payload) }); }
+export function createDefect(inspectionId, payload) { return request(`/inspections/${inspectionId}/defects`, { method: "POST", body: JSON.stringify(payload) }); }
+export function createGPSTrack(roadId, payload) { return request(`/roads/${roadId}/gps-tracks`, { method: "POST", body: JSON.stringify(payload) }); }
 
 export function uploadImage({ file, inspectionId, defectId, capturedAt, latitude, longitude }) {
   const formData = new FormData();
@@ -66,13 +55,6 @@ export function uploadImage({ file, inspectionId, defectId, capturedAt, latitude
   if (longitude !== null && longitude !== undefined) formData.append("longitude", longitude);
   return request("/images/upload", { method: "POST", body: formData });
 }
-
-export function runAIDetection(imageId) {
-  return request(`/images/${imageId}/ai-detect`, { method: "POST" });
-}
-
-export function getAIDetections(imageId) {
-  return request(`/images/${imageId}/ai-detections`);
-}
-
+export function runAIDetection(imageId) { return request(`/images/${imageId}/ai-detect`, { method: "POST" }); }
+export function getAIDetections(imageId) { return request(`/images/${imageId}/ai-detections`); }
 export { API_BASE };
