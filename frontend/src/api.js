@@ -46,6 +46,8 @@ export function getDefectGeoJSON() { return request("/defects/geojson"); }
 export function getRoadSections(roadId) { return request(`/roads/${roadId}/sections`); }
 export function getChainagePoints(sectionId) { return request(`/sections/${sectionId}/chainage-points`); }
 export function getRoadInspections(roadId) { return request(`/roads/${roadId}/inspections`); }
+export function getInspection(inspectionId) { return request(`/inspections/${inspectionId}`); }
+export function getInspectionWorkflow(inspectionId) { return request(`/inspections/${inspectionId}/workflow`); }
 
 export function getRoadMaintenance(roadId) { return request(`/roads/${roadId}/maintenance`); }
 export function getRoadMaintenanceGeoJSON(roadId) { return request(`/roads/${roadId}/maintenance/geojson`); }
@@ -69,15 +71,24 @@ export function getMaintenancePlanSummary(planId) { return request(`/maintenance
 export function getMaintenancePlanOptimization(planId) { return request(`/maintenance-plans/${planId}/optimization`); }
 export function createMaintenancePlan(payload) { return request("/maintenance-plans", { method: "POST", body: JSON.stringify(payload) }); }
 export function updateMaintenancePlan(planId, payload) { return request(`/maintenance-plans/${planId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
+export function updateMaintenancePlanStatus(planId, payload) { return request(`/maintenance-plans/${planId}/status`, { method: "PATCH", body: JSON.stringify(payload) }); }
+export function assignMaintenanceToPlan(planId, maintenanceId) { return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "POST" }); }
+export function unassignMaintenanceFromPlan(planId, maintenanceId) { return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "DELETE" }); }
 
 export function getWorkOrders() { return request("/work-orders"); }
+export function getMaintenanceWorkOrders(maintenanceId) { return request(`/maintenance/${maintenanceId}/work-orders`); }
 export function getWorkOrder(workOrderId) { return request(`/work-orders/${workOrderId}`); }
+export function getWorkOrderHistory(workOrderId) { return request(`/work-orders/${workOrderId}/history`); }
 export function createWorkOrder(payload) { return request("/work-orders", { method: "POST", body: JSON.stringify(payload) }); }
 export function updateWorkOrder(workOrderId, payload) { return request(`/work-orders/${workOrderId}`, { method: "PATCH", body: JSON.stringify(payload) }); }
 
-export function getReportsSummary() { return request("/reports/summary"); }
-export function getConditionAssessment(sectionId) { return request(`/sections/${sectionId}/condition-assessment`); }
-export function requestConditionMaintenance(sectionId) {
+export function getMaintenanceReport(params = "") { return request(`/reports/maintenance${params}`); }
+export function getRoadConditionReport(params = "") { return request(`/reports/road-condition${params}`); }
+export function getDefectReport(params = "") { return request(`/reports/defects${params}`); }
+export function getCostReport(params = "") { return request(`/reports/costs${params}`); }
+export function getSectionConditionAssessment(sectionId) { return request(`/sections/${sectionId}/condition-assessment`); }
+export function getRoadConditionAssessment(roadId) { return request(`/roads/${roadId}/condition-assessment`); }
+export function createMaintenanceFromConditionAssessment(sectionId) {
   return request(`/sections/${sectionId}/condition-assessment/maintenance`, { method: "POST" });
 }
 
