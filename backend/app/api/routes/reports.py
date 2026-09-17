@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.core.security import AuthenticatedUser
 from app.db.session import get_db
-from app.models.inspection import Inspection
 from app.models.maintenance_activity import MaintenanceActivity
 from app.models.maintenance_plan import MaintenancePlan
 from app.models.road import Road
@@ -267,3 +266,21 @@ def maintenance_report_csv(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=maintenance-report.csv"},
     )
+
+
+@router.get("/reports/export.xlsx")
+def reports_export_xlsx(
+    db: DbSession,
+    current_user: AuthenticatedUser,
+    road_id: int | None = None,
+    plan_year: int | None = None,
+    status: str | None = None,
+):
+    """Multi-sheet Excel workbook: Maintenance, Condition, Defects, Costs."""
+    from app.api.routes.excel_export import build_reports_workbook
+
+    maint = maintenance_report(db, current_user, road_id, plan_year, status)
+    condition = road_condition_report(db, current_user, road_id)
+    defects = defect_report(db, current_user, road_id)
+    costs = cost_report(db, current_user, road_id, plan_year)
+    return build_reports_workbook(maint, condition, defects, costs)
