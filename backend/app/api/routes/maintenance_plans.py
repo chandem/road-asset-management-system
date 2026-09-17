@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,13 +9,17 @@ from app.core.security import AuthenticatedUser, EngineerUser
 from app.db.session import get_db
 from app.models.maintenance_activity import MaintenanceActivity
 from app.models.maintenance_plan import MaintenancePlan
+from app.models.road_section import RoadSection
 from app.schemas.maintenance_activity import MaintenanceActivityResponse
 from app.schemas.maintenance_plan import (
+    MaintenanceOptimizationItem,
+    MaintenanceOptimizationResponse,
     MaintenancePlanCreate,
     MaintenancePlanResponse,
     MaintenancePlanSummaryResponse,
     MaintenancePlanUpdate,
 )
+from app.services.maintenance_optimizer import OptimizationCandidate, optimize_maintenance, optimization_score
 
 router = APIRouter(tags=["Maintenance Plans"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -103,6 +108,94 @@ def get_plan_summary(plan_id: int, db: DbSession, current_user: AuthenticatedUse
         remaining_budget=remaining_budget,
         budget_utilization_percent=budget_utilization_percent,
         priority_counts=priority_counts,
+    )
+
+
+@router.get(
+    "/maintenance-plans/{plan_id}/optimization",
+    response_model=MaintenanceOptimizationResponse,
+)
+def get_plan_optimization(plan_id: int, db: DbSession, current_user: AuthenticatedUser):
+    plan = db.get(MaintenancePlan, plan_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Maintenance plan not found")
+
+    activities = db.scalars(
+        select(MaintenanceActivity)
+        .where(MaintenanceActivity.plan_id == plan_id)
+    ).all()
+    section_ids = {activity.section_id for activity in activities if activity.section_id is not None}
+    sections = {
+        section.section_id: section
+        for section in db.scalars(select(RoadSection).where(RoadSection.section_id.in_(section_ids))).all()
+    } if section_ids else {}
+
+    candidates: list[OptimizationCandidate] = []
+    for activity in activities:
+        if activity.status == "cancelled":
+            continue
+        priority = activity.priority or "low"
+        condition_score = None
+        if activity.section_id in sections:
+            rating = sections[activity.section_id].condition_rating
+            condition_score = None if rating is None else float(rating)
+        score, overdue = optimization_score(
+            priority=priority,
+            condition_score=condition_score,
+            planned_date=activity.planned_date,
+            status=activity.status,
+        )
+        candidates.append(
+            OptimizationCandidate(
+                maintenance_id=activity.maintenance_id,
+                activity_type=activity.activity_type,
+                priority=priority,
+                condition_score=condition_score,
+                estimated_cost=max(0.0, float(activity.estimated_cost or 0)),
+                planned_date=activity.planned_date,
+                score=score,
+                overdue=overdue,
+            )
+        )
+
+    result = optimize_maintenance(candidates, plan.budget)
+
+    def serialize(items: list[OptimizationCandidate]) -> list[MaintenanceOptimizationItem]:
+        cumulative = 0.0
+        output = []
+        budget = result.budget
+        for item in items:
+            cumulative += item.estimated_cost
+            output.append(
+                MaintenanceOptimizationItem(
+                    maintenance_id=item.maintenance_id,
+                    activity_type=item.activity_type,
+                    priority=item.priority,
+                    condition_score=item.condition_score,
+                    estimated_cost=item.estimated_cost,
+                    planned_date=item.planned_date,
+                    score=item.score,
+                    overdue=item.overdue,
+                    cumulative_cost=round(cumulative, 2),
+                    within_budget=budget is None or cumulative <= budget,
+                )
+            )
+        return output
+
+    recommended = serialize(result.recommended)
+    excluded = serialize(result.excluded)
+    total_candidate_cost = round(sum(item.estimated_cost for item in candidates), 2)
+
+    return MaintenanceOptimizationResponse(
+        plan_id=plan_id,
+        budget=result.budget,
+        total_candidate_cost=total_candidate_cost,
+        total_recommended_cost=result.total_recommended_cost,
+        remaining_budget=result.remaining_budget,
+        recommended_count=len(recommended),
+        excluded_count=len(excluded),
+        recommended=recommended,
+        excluded=excluded,
     )
 
 
