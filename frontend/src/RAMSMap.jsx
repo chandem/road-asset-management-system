@@ -68,20 +68,12 @@ function chainageStyle(feature, latlng) {
   return L.circleMarker(latlng, { radius: 4, weight: 1, fillOpacity: 0.9 });
 }
 
-function combineGeoJSON(collections) {
-  return {
-    type: "FeatureCollection",
-    features: collections.flatMap((x) => x?.features || []),
-  };
-}
-
 function getPointFromFeature(feature) {
   const geometry = feature?.geometry;
   if (!geometry) return null;
   if (geometry.type === "Point") return geometry.coordinates;
   if (geometry.type === "LineString" && geometry.coordinates.length) {
-    const middle = geometry.coordinates[Math.floor(geometry.coordinates.length / 2)];
-    return middle;
+    return geometry.coordinates[Math.floor(geometry.coordinates.length / 2)];
   }
   return null;
 }
@@ -123,11 +115,11 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
       setSpatialLoading(true);
       try {
         const sections = sectionGeoJSON.features;
-        const chainageResults = await Promise.all(
-          [...new Set(sections.map((f) => f?.properties?.section_id).filter(Boolean))]
-            .map((id) => getChainagePoints(Number(id)).catch(() => [])),
-        );
         const sectionById = new Map(sections.map((f) => [Number(f?.properties?.section_id), f]));
+        const sectionIds = [...new Set(sections.map((f) => f?.properties?.section_id).filter(Boolean))];
+        const chainageResults = await Promise.all(
+          sectionIds.map((id) => getChainagePoints(Number(id)).catch(() => [])),
+        );
         const chainageFeatures = chainageResults.flatMap((points) => points.map((p) => ({
           type: "Feature",
           geometry: { type: "Point", coordinates: [Number(p.longitude), Number(p.latitude)] },
@@ -173,10 +165,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     ["maintenance", "Maintenance", filtered.maintenanceGeoJSON],
   ];
 
-  const layers = useMemo(
-    () => layerDefinitions.map(([, , data]) => data),
-    [filtered],
-  );
+  const layers = useMemo(() => layerDefinitions.map(([, , data]) => data), [filtered]);
 
   const roadOptions = (roadGeoJSON?.features || []).map((feature) => ({
     id: feature?.properties?.road_id,
