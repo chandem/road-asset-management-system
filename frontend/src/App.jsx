@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import {
-  createDefect, createInspection, createMaintenance, getAIDetections, getAIStatus, getDashboardSummary, getDashboardAttention, getDefectGeoJSON, getGPSTrackGeoJSON,
+  createDefect, createInspection, createMaintenance, getAIDetections, getAIStatus, getDashboardSummary, getDashboardAttention, getDashboardKPIs, getDefectGeoJSON, getGPSTrackGeoJSON,
   getRoadAssetGeoJSON, getRoadGeoJSON, getRoadMaintenance, getRoadSectionGeoJSON,
   runAIDetection, uploadImage,
 } from "./api";
@@ -41,7 +41,7 @@ function App({ user }) {
   const [aiMessage, setAiMessage] = useState("");
   const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
   const [summaryCounts, setSummaryCounts] = useState(null);
-  const [attention, setAttention] = useState(null);
+  const [attention, setAttention] = useState(null);\n  const [kpis, setKpis] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [maintenanceRoadId, setMaintenanceRoadId] = useState(""); const [maintenance, setMaintenance] = useState([]);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
@@ -349,6 +349,14 @@ function App({ user }) {
         {activeTab === "overview" && (
           <>
             <SummaryCards loading={loading} counts={summaryCounts} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} />
+    {activeTab === "overview" && kpis && (
+      <section className="cards" aria-label="RAMS performance KPIs">
+        <div className="card"><span>Maintenance completion</span><strong>{kpis.maintenance?.completion_rate_percent ?? "—"}%</strong></div>
+        <div className="card"><span>Overdue maintenance</span><strong>{kpis.maintenance?.overdue ?? 0}</strong></div>
+        <div className="card"><span>Cost variance</span><strong>{kpis.cost?.variance_percent ?? "—"}%</strong></div>
+        <div className="card"><span>Verified work orders</span><strong>{kpis.work_orders?.verified ?? 0}</strong></div>
+      </section>
+    )}
             <AttentionPanel attention={attention} loading={loading} onNavigate={setActiveTab} />
             <ReportPanel report={report} onRefresh={loadDashboard} />
             <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
