@@ -11,6 +11,8 @@ from app.models.maintenance_activity import MaintenanceActivity
 from app.models.work_order import WorkOrder
 from app.models.work_order_history import WorkOrderHistory
 from app.models.work_order_execution import WorkOrderExecution
+from app.models.work_order_verification import WorkOrderVerification
+from app.schemas.work_order_verification import WorkOrderVerificationCreate, WorkOrderVerificationResponse
 from app.schemas.work_order_execution import WorkOrderExecutionCreate, WorkOrderExecutionResponse, WorkOrderExecutionUpdate
 from app.schemas.work_order import WorkOrderCreate, WorkOrderResponse, WorkOrderUpdate
 
@@ -199,3 +201,36 @@ def update_execution(work_order_id: int, payload: WorkOrderExecutionUpdate, db: 
         db.rollback()
         raise HTTPException(status_code=400, detail="Could not update work order execution")
     return execution
+
+
+
+@router.get("/work-orders/{work_order_id}/verification", response_model=WorkOrderVerificationResponse | None)
+def get_verification(work_order_id: int, db: DbSession, current_user: AuthenticatedUser):
+    if db.get(WorkOrder, work_order_id) is None:
+        raise HTTPException(status_code=404, detail="Work order not found")
+    return db.scalar(select(WorkOrderVerification).where(WorkOrderVerification.work_order_id == work_order_id))
+
+
+@router.post("/work-orders/{work_order_id}/verification", response_model=WorkOrderVerificationResponse, status_code=201)
+def create_verification(work_order_id: int, payload: WorkOrderVerificationCreate, db: DbSession, current_user: EngineerUser):
+    order = db.get(WorkOrder, work_order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Work order not found")
+    if order.status != "completed":
+        raise HTTPException(status_code=400, detail="Only completed work orders can be verified")
+    if db.scalar(select(WorkOrderVerification).where(WorkOrderVerification.work_order_id == work_order_id)):
+        raise HTTPException(status_code=409, detail="Work order verification already exists")
+    verification = WorkOrderVerification(
+        work_order_id=work_order_id,
+        verified_at=payload.verified_at or datetime.now(timezone.utc),
+        **payload.model_dump(exclude={"verified_at"}),
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(verification)
+    try:
+        db.commit()
+        db.refresh(verification)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not create work order verification")
+    return verification
