@@ -212,6 +212,16 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     setSectionDetail(null);
   }
 
+  function openMaintenanceForSection(sectionId) {
+    onNavigate?.("maintenance");
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent("rams:select-maintenance-section", { detail: { sectionId } })), 0);
+  }
+
+  function openWorkOrdersForSection(sectionId) {
+    onNavigate?.("workorders");
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent("rams:select-workorder-section", { detail: { sectionId } })), 0);
+  }
+
   const sectionPopupHandlers = useMemo(() => (feature, layer) => {
     const sectionId = Number(feature?.properties?.section_id);
     const score = Number(feature?.properties?.condition_rating);
@@ -311,7 +321,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
               {sectionDetail.inspections.length ? <ul>{sectionDetail.inspections.slice(0, 10).map((item, index) => <li key={item?.inspection_id || index}><strong>{escapeHtml(item?.inspection_date || "Inspection")}</strong> — condition {item?.condition_rating != null ? escapeHtml(item.condition_rating) : "not rated"}{item?.weather ? " · " + escapeHtml(item.weather) : ""}</li>)}</ul> : <p>No recorded inspections for this section.</p>}
               <h4>Defect history</h4>
               {sectionDetail.defects.length ? <ul>{sectionDetail.defects.slice(0, 10).map((item, index) => <li key={item?.properties?.defect_id || index}><strong>{escapeHtml(item?.properties?.defect_type || "Defect")}</strong> — {escapeHtml(item?.properties?.severity || "unclassified")}{item?.properties?.chainage_km != null ? " · Ch. " + item.properties.chainage_km : ""}</li>)}</ul> : <p>No recorded defects for this section.</p>}
-              <div className="actions" style={{ marginBottom: 12 }}><button type="button" onClick={() => onNavigate?.("maintenance")}>Open Maintenance</button><button type="button" onClick={() => onNavigate?.("workorders")}>Open Work Orders</button></div>
+              <div className="actions" style={{ marginBottom: 12 }}><button type="button" onClick={() => openMaintenanceForSection(Number(selectedSection?.properties?.section_id))}>Open Maintenance</button><button type="button" onClick={() => openWorkOrdersForSection(Number(selectedSection?.properties?.section_id))}>Open Work Orders</button></div>
               <h4>Maintenance & work-order history</h4>
               {sectionDetail.maintenance.length ? sectionDetail.maintenance.map(({ item, history, workOrders }) => {
                 const p = item?.properties || {};
