@@ -54,11 +54,7 @@ CREATE TABLE road_sections (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (road_id, section_code),
     CHECK (end_chainage >= start_chainage),
-    CHECK (condition_rating IS NULL OR (condition_rating >= 0 AND condition_rating <= 100)),
-    CHECK (criticality BETWEEN 1 AND 5),
-    CHECK (expected_life_years IS NULL OR expected_life_years >= 1),
-    CHECK (replacement_cost IS NULL OR replacement_cost >= 0),
-    CHECK (replacement_threshold BETWEEN 0 AND 100)
+    CHECK (condition_rating IS NULL OR (condition_rating >= 0 AND condition_rating <= 100))
 );
 
 CREATE TABLE chainage_points (
@@ -91,7 +87,11 @@ CREATE TABLE road_assets (
     description TEXT,
     geometry geometry(Point, 4326),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (condition_rating IS NULL OR (condition_rating >= 0 AND condition_rating <= 100))
+    CHECK (condition_rating IS NULL OR (condition_rating >= 0 AND condition_rating <= 100)),
+    CHECK (criticality BETWEEN 1 AND 5),
+    CHECK (expected_life_years IS NULL OR expected_life_years >= 1),
+    CHECK (replacement_cost IS NULL OR replacement_cost >= 0),
+    CHECK (replacement_threshold BETWEEN 0 AND 100)
 );
 
 CREATE TABLE bridges (
