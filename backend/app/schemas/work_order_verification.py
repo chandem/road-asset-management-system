@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 VERIFICATION_RESULTS = ("accepted", "accepted with observations", "rejected")
@@ -17,6 +17,7 @@ class WorkOrderVerificationCreate(BaseModel):
     gps_longitude: Optional[float] = Field(default=None, ge=-180, le=180)
     remarks: Optional[str] = None
 
+    @field_validator("result")
     @classmethod
     def validate_result(cls, value: str) -> str:
         if value not in VERIFICATION_RESULTS:
