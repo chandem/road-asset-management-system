@@ -24,6 +24,8 @@ describe("roles", () => {
     expect(canAccessTab("reports", "engineer")).toBe(true);
     expect(canAccessTab("decision", "engineer")).toBe(true);
     expect(canAccessTab("assets", "engineer")).toBe(true);
+    expect(canAccessTab("audit", "engineer")).toBe(true);
+    expect(canAccessTab("audit", "inspector")).toBe(false);
   });
 
   it("filters nav groups for field_staff", () => {
@@ -46,5 +48,11 @@ describe("roles", () => {
     const groups = filterNavGroups("engineer");
     const ops = groups.find((g) => g.id === "operations");
     expect(ops.tabs.map((t) => t.id)).toContain("assets");
+  });
+
+  it("includes audit under insights for engineer", () => {
+    const groups = filterNavGroups("engineer");
+    const insights = groups.find((g) => g.id === "insights");
+    expect(insights.tabs.map((t) => t.id)).toContain("audit");
   });
 });

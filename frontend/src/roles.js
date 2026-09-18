@@ -14,6 +14,7 @@ export const TAB_ROLES = {
   effectiveness: ["admin", "engineer"],
   decision: ["admin", "engineer"],
   reports: ["admin", "engineer"],
+  audit: ["admin", "engineer"],
 };
 
 export const ALL_NAV_GROUPS = [
@@ -52,6 +53,7 @@ export const ALL_NAV_GROUPS = [
       { id: "effectiveness", label: "Effectiveness" },
       { id: "decision", label: "Decision support" },
       { id: "reports", label: "Reports" },
+      { id: "audit", label: "Audit" },
     ],
   },
 ];
