@@ -128,6 +128,46 @@ def list_all_assets(
     return db.scalars(query).all()
 
 
+@router.get("/assets/{asset_id}/replacement-plan")
+def asset_replacement_plan(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
+    asset = db.get(RoadAsset, asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Road asset not found")
+    return _replacement_plan(asset)
+
+
+@router.get("/assets/replacement-plan")
+def replacement_plan(
+    db: DbSession,
+    current_user: AuthenticatedUser,
+    road_id: int | None = None,
+    priority: str | None = None,
+):
+    query = select(RoadAsset).order_by(RoadAsset.road_id, RoadAsset.chainage_km, RoadAsset.asset_id)
+    if road_id is not None:
+        query = query.where(RoadAsset.road_id == road_id)
+    plans = [_replacement_plan(a) for a in db.scalars(query).all()]
+    if priority:
+        plans = [p for p in plans if p["replacement_priority"] == priority.lower()]
+    plans.sort(key=lambda p: (
+        {"critical": 0, "high": 1, "medium": 2, "low": 3}[p["replacement_priority"]],
+        -(p["criticality"] or 0),
+        p["remaining_useful_life_years"] if p["remaining_useful_life_years"] is not None else 9999,
+    ))
+    return {
+        "assets": plans,
+        "summary": {
+            "total_assets": len(plans),
+            "replacement_due": sum(1 for p in plans if p["replacement_due"]),
+            "critical": sum(1 for p in plans if p["replacement_priority"] == "critical"),
+            "high": sum(1 for p in plans if p["replacement_priority"] == "high"),
+            "medium": sum(1 for p in plans if p["replacement_priority"] == "medium"),
+            "low": sum(1 for p in plans if p["replacement_priority"] == "low"),
+            "budget": round(sum(p["replacement_cost"] or 0 for p in plans if p["replacement_due"]), 2),
+        },
+    }
+
+
 @router.get("/assets/{asset_id}/lifecycle-summary")
 def asset_lifecycle_summary(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
     from app.models.asset_inspection import AssetInspection
@@ -229,6 +269,11 @@ def create_asset(
         chainage_km=payload.chainage_km,
         description=payload.description,
         condition_rating=payload.condition_rating,
+        criticality=payload.criticality,
+        commissioning_year=payload.commissioning_year,
+        expected_life_years=payload.expected_life_years,
+        replacement_cost=payload.replacement_cost,
+        replacement_threshold=payload.replacement_threshold,
         geometry=geometry,
     )
 
