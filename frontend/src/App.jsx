@@ -362,7 +362,7 @@ function App({ user }) {
                 <div className="card"><span>Verified work orders</span><strong>{kpis.work_orders?.verified ?? 0}</strong></div>
               </section>
             )}
-            <AttentionPanel attention={attention} loading={loading} onNavigate={setActiveTab} />
+            <AttentionPanel attention={attention} loading={loading} onSectionSelect={setSelectedMapSection} />
             <ReportPanel report={report} onRefresh={loadDashboard} />
             <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} onNavigate={setActiveTab} />
           </>
@@ -370,7 +370,7 @@ function App({ user }) {
 
         {activeTab === "map" && (
           <>
-            <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={visible} loading={loading} onSectionSelect={setSelectedMapSection} />
+            <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} onSectionSelect={setSelectedMapSection} />
             <SectionDetails section={selectedMapSection} defects={(defectGeoJSON?.features || []).filter((f) => Number(f?.properties?.section_id) === Number(selectedMapSection?.properties?.section_id))} onClose={() => setSelectedMapSection(null)} />
           </>
         )}
