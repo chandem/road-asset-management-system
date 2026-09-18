@@ -59,11 +59,12 @@ function App({ user }) {
     setLoading(true); setError("");
     try {
       const soft = (p) => p.catch(() => null);
-      const [summary, rg, gg, dg] = await Promise.all([
+      const [summary, rg, gg, dg, dashboardKpis] = await Promise.all([
         getDashboardSummary(),
         soft(getRoadGeoJSON()),
         soft(getGPSTrackGeoJSON()),
         soft(getDefectGeoJSON()),
+        soft(getDashboardKPIs()),
       ]);
       setRoads(summary.roads || []);
       setSections(summary.sections || []);
@@ -73,6 +74,7 @@ function App({ user }) {
       setGpsGeoJSON(gg);
       setDefectGeoJSON(dg);
       setSummaryCounts(summary.counts || null);
+      setKpis(dashboardKpis);
       try {
         setAttention(await getDashboardAttention());
       } catch (_) {
