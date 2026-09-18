@@ -19,6 +19,8 @@ RAMS is designed to support road agencies, maintenance teams, and engineers with
 - Work history and maintenance records
 - Dashboards and reports
 - Image-based road defect classification
+- Asset lifecycle and replacement planning
+- Network renewal budget analytics
 - Role-based access and user management
 - Centralized database and API
 
@@ -176,6 +178,10 @@ Demo accounts (password **`DemoPass123!`**):
 
 The script is idempotent — safe to run more than once.
 
+### AI model setup
+
+RAMS includes a YOLO inference adapter for road-defect images. The application reports AI readiness through `GET /api/v1/ai/status`. For real inference, provide trained weights at `AI_MODEL_PATH` and keep `AI_STUB_MODE=false`. Stub mode is intended only for demos/CI.
+
 ### Environment variables
 
 See `.env.example` (root) and `backend/.env.example` for the full list.
@@ -226,11 +232,13 @@ For a public or agency host (TLS, secrets, backups, AI model, hardening), see **
 7. Condition assessment and maintenance planning
 8. Reporting and dashboards
 9. Image-based defect detection
-10. Testing, deployment, and security improvements
+10. Asset lifecycle and renewal planning
+11. Advanced analytics and decision support
+12. Testing, deployment, and security improvements
 
 ## Project Status
 
-🚧 **Active development**
+🚧 **Active development — core RAMS workflows implemented; final hardening and production validation remain.**
 
 RAMS is under development and the architecture will evolve as new road-management requirements are added.
 
