@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models.road import Road
 from app.models.road_asset import RoadAsset
 from app.models.road_section import RoadSection
-from app.schemas.road_asset import RoadAssetCreate, RoadAssetResponse
+from app.schemas.road_asset import RoadAssetCreate, RoadAssetResponse, RoadAssetUpdate
 
 router = APIRouter(tags=["Road Assets"])
 
@@ -57,6 +57,18 @@ def _replacement_plan(asset: RoadAsset, year: int = 2026) -> dict:
         "replacement_due": due_by_age or due_by_condition,
     }
 
+
+def _apply_section_rules(db: Session, road_id: int, section_id, chainage_km):
+    if section_id is None:
+        return
+    section = db.get(RoadSection, section_id)
+    if section is None or section.road_id != road_id:
+        raise HTTPException(status_code=400, detail="Section does not belong to this road")
+    if chainage_km is not None and not (
+        float(section.start_chainage) <= chainage_km <= float(section.end_chainage)
+    ):
+        raise HTTPException(status_code=400, detail="Asset chainage is outside the section range")
+
 DbSession = Annotated[Session, Depends(get_db)]
 
 
@@ -64,11 +76,8 @@ DbSession = Annotated[Session, Depends(get_db)]
 def list_assets(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
-
     return db.scalars(
-        select(RoadAsset)
-        .where(RoadAsset.road_id == road_id)
-        .order_by(RoadAsset.chainage_km, RoadAsset.asset_id)
+        select(RoadAsset).where(RoadAsset.road_id == road_id).order_by(RoadAsset.chainage_km, RoadAsset.asset_id)
     ).all()
 
 
@@ -76,50 +85,30 @@ def list_assets(road_id: int, db: DbSession, current_user: AuthenticatedUser):
 def assets_geojson(road_id: int, db: DbSession, current_user: AuthenticatedUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
-
     rows = db.execute(
         select(
-            RoadAsset.asset_id,
-            RoadAsset.section_id,
-            RoadAsset.asset_type,
-            RoadAsset.asset_code,
-            RoadAsset.chainage_km,
-            RoadAsset.description,
-            RoadAsset.condition_rating,
+            RoadAsset.asset_id, RoadAsset.section_id, RoadAsset.asset_type, RoadAsset.asset_code,
+            RoadAsset.chainage_km, RoadAsset.description, RoadAsset.condition_rating,
             func.ST_AsGeoJSON(RoadAsset.geometry),
-        )
-        .where(RoadAsset.road_id == road_id)
-        .order_by(RoadAsset.chainage_km, RoadAsset.asset_id)
+        ).where(RoadAsset.road_id == road_id).order_by(RoadAsset.chainage_km, RoadAsset.asset_id)
     ).all()
-
     features = []
     for row in rows:
         geometry = json.loads(row[7]) if row[7] else None
         features.append({
-            "type": "Feature",
-            "geometry": geometry,
+            "type": "Feature", "geometry": geometry,
             "properties": {
-                "asset_id": row[0],
-                "section_id": row[1],
-                "asset_type": row[2],
-                "asset_code": row[3],
+                "asset_id": row[0], "section_id": row[1], "asset_type": row[2], "asset_code": row[3],
                 "chainage_km": float(row[4]) if row[4] is not None else None,
                 "description": row[5],
                 "condition_rating": float(row[6]) if row[6] is not None else None,
             },
         })
-
     return {"type": "FeatureCollection", "features": features}
 
 
 @router.get("/assets", response_model=list[RoadAssetResponse])
-def list_all_assets(
-    db: DbSession,
-    current_user: AuthenticatedUser,
-    road_id: int | None = None,
-    asset_type: str | None = None,
-):
-    """Asset register: list assets across roads with optional filters."""
+def list_all_assets(db: DbSession, current_user: AuthenticatedUser, road_id: int | None = None, asset_type: str | None = None):
     query = select(RoadAsset).order_by(RoadAsset.road_id, RoadAsset.chainage_km, RoadAsset.asset_id)
     if road_id is not None:
         query = query.where(RoadAsset.road_id == road_id)
@@ -130,40 +119,25 @@ def list_all_assets(
 
 @router.get("/assets/geojson")
 def all_assets_geojson(db: DbSession, current_user: AuthenticatedUser):
-    """Global FeatureCollection of all road assets (avoids N+1 per-road fetches)."""
     rows = db.execute(
         select(
-            RoadAsset.asset_id,
-            RoadAsset.road_id,
-            RoadAsset.section_id,
-            RoadAsset.asset_type,
-            RoadAsset.asset_code,
-            RoadAsset.chainage_km,
-            RoadAsset.description,
-            RoadAsset.condition_rating,
+            RoadAsset.asset_id, RoadAsset.road_id, RoadAsset.section_id, RoadAsset.asset_type, RoadAsset.asset_code,
+            RoadAsset.chainage_km, RoadAsset.description, RoadAsset.condition_rating,
             func.ST_AsGeoJSON(RoadAsset.geometry),
-        )
-        .order_by(RoadAsset.road_id, RoadAsset.chainage_km, RoadAsset.asset_id)
+        ).order_by(RoadAsset.road_id, RoadAsset.chainage_km, RoadAsset.asset_id)
     ).all()
-
     features = []
     for row in rows:
         geometry = json.loads(row[8]) if row[8] else None
         features.append({
-            "type": "Feature",
-            "geometry": geometry,
+            "type": "Feature", "geometry": geometry,
             "properties": {
-                "asset_id": row[0],
-                "road_id": row[1],
-                "section_id": row[2],
-                "asset_type": row[3],
-                "asset_code": row[4],
+                "asset_id": row[0], "road_id": row[1], "section_id": row[2], "asset_type": row[3], "asset_code": row[4],
                 "chainage_km": float(row[5]) if row[5] is not None else None,
                 "description": row[6],
                 "condition_rating": float(row[7]) if row[7] is not None else None,
             },
         })
-
     return {"type": "FeatureCollection", "features": features}
 
 
@@ -176,12 +150,7 @@ def asset_replacement_plan(asset_id: int, db: DbSession, current_user: Authentic
 
 
 @router.get("/assets/replacement-plan")
-def replacement_plan(
-    db: DbSession,
-    current_user: AuthenticatedUser,
-    road_id: int | None = None,
-    asset_type: str | None = None,
-):
+def replacement_plan(db: DbSession, current_user: AuthenticatedUser, road_id: int | None = None, asset_type: str | None = None):
     query = select(RoadAsset).order_by(RoadAsset.road_id, RoadAsset.asset_id)
     if road_id is not None:
         query = query.where(RoadAsset.road_id == road_id)
@@ -194,8 +163,12 @@ def replacement_plan(
         "summary": {
             "asset_count": len(plans),
             "replacement_due_count": len(due),
+            "replacement_due": len(due),
             "critical_count": sum(1 for p in plans if p["replacement_priority"] == "critical"),
+            "critical": sum(1 for p in plans if p["replacement_priority"] == "critical"),
             "high_count": sum(1 for p in plans if p["replacement_priority"] == "high"),
+            "high": sum(1 for p in plans if p["replacement_priority"] == "high"),
+            "budget": sum(p["replacement_cost"] or 0 for p in due),
         },
         "items": plans,
     }
@@ -212,16 +185,11 @@ def asset_lifecycle_summary(asset_id: int, db: DbSession, current_user: Authenti
     if asset is None:
         raise HTTPException(status_code=404, detail="Road asset not found")
 
-    inspections = db.scalars(
-        select(AssetInspection).where(AssetInspection.asset_id == asset_id)
-        .order_by(AssetInspection.inspection_date)
-    ).all()
+    inspections = db.scalars(select(AssetInspection).where(AssetInspection.asset_id == asset_id).order_by(AssetInspection.inspection_date)).all()
     defects = db.scalars(select(RoadDefect).where(RoadDefect.asset_id == asset_id)).all()
     maintenance = db.scalars(select(MaintenanceActivity).where(MaintenanceActivity.asset_id == asset_id)).all()
     work_orders = db.scalars(
-        select(WorkOrder)
-        .join(MaintenanceActivity, WorkOrder.maintenance_id == MaintenanceActivity.maintenance_id)
-        .where(MaintenanceActivity.asset_id == asset_id)
+        select(WorkOrder).join(MaintenanceActivity, WorkOrder.maintenance_id == MaintenanceActivity.maintenance_id).where(MaintenanceActivity.asset_id == asset_id)
     ).all()
 
     ratings = [float(i.condition_rating) for i in inspections if i.condition_rating is not None]
@@ -239,26 +207,13 @@ def asset_lifecycle_summary(asset_id: int, db: DbSession, current_user: Authenti
     return {
         "asset_id": asset_id,
         "asset_type": asset.asset_type,
-        "condition": {
-            "current": current_condition,
-            "previous": previous_condition,
-            "trend": trend,
-            "inspection_count": len(inspections),
-        },
+        "condition": {"current": current_condition, "previous": previous_condition, "trend": trend, "inspection_count": len(inspections)},
         "failures": {
             "defect_count": len(defects),
             "high_severity_count": sum(1 for d in defects if str(d.severity or "").lower() in {"high", "critical", "severe", "very high"}),
         },
-        "maintenance": {
-            "total": len(maintenance),
-            "open": open_maintenance,
-            "estimated_cost": round(estimated_cost, 2),
-            "actual_cost": round(actual_cost, 2),
-        },
-        "work_orders": {
-            "total": len(work_orders),
-            "open": open_work_orders,
-        },
+        "maintenance": {"total": len(maintenance), "open": open_maintenance, "estimated_cost": round(estimated_cost, 2), "actual_cost": round(actual_cost, 2)},
+        "work_orders": {"total": len(work_orders), "open": open_work_orders},
     }
 
 
@@ -270,30 +225,49 @@ def get_asset(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
     return asset
 
 
+@router.patch("/assets/{asset_id}", response_model=RoadAssetResponse)
+def update_asset(asset_id: int, payload: RoadAssetUpdate, db: DbSession, current_user: EngineerUser):
+    asset = db.get(RoadAsset, asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Road asset not found")
+    data = payload.model_dump(exclude_unset=True)
+    geometry_wkt = data.pop("geometry_wkt", None)
+    section_id = data.get("section_id", asset.section_id)
+    chainage_km = data.get("chainage_km", asset.chainage_km)
+    _apply_section_rules(db, asset.road_id, section_id, chainage_km)
+    for key, value in data.items():
+        setattr(asset, key, value)
+    if geometry_wkt is not None:
+        asset.geometry = func.ST_GeomFromText(geometry_wkt, 4326) if geometry_wkt else None
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not update road asset")
+    db.refresh(asset)
+    return asset
+
+
+@router.delete("/assets/{asset_id}", status_code=204)
+def delete_asset(asset_id: int, db: DbSession, current_user: EngineerUser):
+    asset = db.get(RoadAsset, asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Road asset not found")
+    db.delete(asset)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not delete road asset; it may still be referenced")
+    return None
+
+
 @router.post("/roads/{road_id}/assets", response_model=RoadAssetResponse, status_code=201)
-def create_asset(
-    road_id: int,
-    payload: RoadAssetCreate,
-    db: DbSession,
-    current_user: EngineerUser,
-):
+def create_asset(road_id: int, payload: RoadAssetCreate, db: DbSession, current_user: EngineerUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
-
-    if payload.section_id is not None:
-        section = db.get(RoadSection, payload.section_id)
-        if section is None or section.road_id != road_id:
-            raise HTTPException(status_code=400, detail="Section does not belong to this road")
-
-        if payload.chainage_km is not None and not (
-            float(section.start_chainage) <= payload.chainage_km <= float(section.end_chainage)
-        ):
-            raise HTTPException(status_code=400, detail="Asset chainage is outside the section range")
-
-    geometry = None
-    if payload.geometry_wkt:
-        geometry = func.ST_GeomFromText(payload.geometry_wkt, 4326)
-
+    _apply_section_rules(db, road_id, payload.section_id, payload.chainage_km)
+    geometry = func.ST_GeomFromText(payload.geometry_wkt, 4326) if payload.geometry_wkt else None
     asset = RoadAsset(
         road_id=road_id,
         section_id=payload.section_id,
@@ -309,13 +283,11 @@ def create_asset(
         replacement_threshold=payload.replacement_threshold,
         geometry=geometry,
     )
-
     db.add(asset)
     try:
         db.commit()
     except Exception:
         db.rollback()
         raise HTTPException(status_code=400, detail="Could not create road asset")
-
     db.refresh(asset)
     return asset
