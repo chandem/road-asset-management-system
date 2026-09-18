@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getChainagePoints, getRoadMaintenanceGeoJSON } from "./api";
+import { getChainagePoints, getRoadMaintenanceGeoJSON, getMaintenanceHistory, getMaintenanceWorkOrders, getWorkOrderExecution, getWorkOrderVerification } from "./api";
 
 const defaultCenter = [8.0, 39.0];
 
@@ -110,6 +110,9 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
   const [maintenanceGeoJSON, setMaintenanceGeoJSON] = useState(null);
   const [selectedRoad, setSelectedRoad] = useState("all");
   const [spatialLoading, setSpatialLoading] = useState(false);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [sectionDetail, setSectionDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const roadIds = useMemo(
     () => [...new Set((roadGeoJSON?.features || []).map((f) => f?.properties?.road_id).filter(Boolean))],
@@ -169,6 +172,43 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     name: feature?.properties?.road_name || feature?.properties?.road_code || `Road ${feature?.properties?.road_id}`,
   })).filter((x) => x.id);
 
+  async function openSectionDetail(feature) {
+    const sectionId = Number(feature?.properties?.section_id);
+    if (!sectionId) return;
+    setSelectedSection(feature);
+    setDetailLoading(true);
+    try {
+      const defects = (filtered.defectGeoJSON?.features || []).filter((item) => Number(item?.properties?.section_id) === sectionId);
+      const maintenance = (filtered.maintenanceGeoJSON?.features || []).filter((item) => Number(item?.properties?.section_id) === sectionId);
+      const maintenanceDetails = await Promise.all(maintenance.map(async (item) => {
+        const maintenanceId = Number(item?.properties?.maintenance_id);
+        if (!maintenanceId) return { item, history: [], workOrders: [] };
+        const [history, workOrders] = await Promise.all([
+          getMaintenanceHistory(maintenanceId).catch(() => []),
+          getMaintenanceWorkOrders(maintenanceId).catch(() => []),
+        ]);
+        const enrichedOrders = await Promise.all((workOrders || []).map(async (order) => {
+          const id = Number(order?.work_order_id);
+          if (!id) return order;
+          const [execution, verification] = await Promise.all([
+            getWorkOrderExecution(id).catch(() => null),
+            getWorkOrderVerification(id).catch(() => null),
+          ]);
+          return { ...order, execution, verification };
+        }));
+        return { item, history: history || [], workOrders: enrichedOrders };
+      }));
+      setSectionDetail({ feature, defects, maintenance: maintenanceDetails });
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  function closeSectionDetail() {
+    setSelectedSection(null);
+    setSectionDetail(null);
+  }
+
   const sectionPopupHandlers = useMemo(() => (feature, layer) => {
     const sectionId = Number(feature?.properties?.section_id);
     const score = Number(feature?.properties?.condition_rating);
@@ -198,6 +238,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
       const status = props.status || "unknown";
       return `<li><strong>${escapeHtml(label)}</strong> — ${escapeHtml(status)}${props.priority ? ` · ${escapeHtml(props.priority)} priority` : ""}</li>`;
     }).join("");
+    layer.on("click", () => { openSectionDetail(feature); });
     layer.bindPopup(`<div class="rams-popup"><strong>${escapeHtml(feature?.properties?.section_code || `Section ${sectionId}`)}</strong><table>
       <tr><td><strong>Condition</strong></td><td>${Number.isFinite(score) ? score.toFixed(1) : "Not rated"}</td></tr>
       <tr><td><strong>Category</strong></td><td>${conditionCategory(score)}</td></tr>
@@ -246,6 +287,40 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
         {(visible.maintenance ?? true) && filtered.maintenanceGeoJSON && <GeoJSON data={filtered.maintenanceGeoJSON} pointToLayer={maintenanceStyle} onEachFeature={popupHandlers()} />}
         <FitLayers layers={layers} />
       </MapContainer>
+      {selectedSection && (
+        <aside className="section-detail-panel" aria-label="Road section RAMS record">
+          <div className="panel-heading">
+            <div>
+              <h3>{selectedSection?.properties?.section_code || ("Section " + (selectedSection?.properties?.section_id || ""))}</h3>
+              <p>{detailLoading ? "Loading section history…" : "Section-level RAMS record"}</p>
+            </div>
+            <button type="button" onClick={closeSectionDetail}>Close</button>
+          </div>
+          {!detailLoading && sectionDetail && (
+            <div className="section-detail-content">
+              <div className="cards compact">
+                <div className="card"><span>Condition</span><strong>{Number.isFinite(Number(selectedSection?.properties?.condition_rating)) ? Number(selectedSection.properties.condition_rating).toFixed(1) : "—"}</strong></div>
+                <div className="card"><span>Category</span><strong>{conditionCategory(Number(selectedSection?.properties?.condition_rating))}</strong></div>
+                <div className="card"><span>Defects</span><strong>{sectionDetail.defects.length}</strong></div>
+                <div className="card"><span>Maintenance</span><strong>{sectionDetail.maintenance.length}</strong></div>
+              </div>
+              <h4>Defect history</h4>
+              {sectionDetail.defects.length ? <ul>{sectionDetail.defects.slice(0, 10).map((item, index) => <li key={item?.properties?.defect_id || index}><strong>{escapeHtml(item?.properties?.defect_type || "Defect")}</strong> — {escapeHtml(item?.properties?.severity || "unclassified")}{item?.properties?.chainage_km != null ? " · Ch. " + item.properties.chainage_km : ""}</li>)}</ul> : <p>No recorded defects for this section.</p>}
+              <h4>Maintenance & work-order history</h4>
+              {sectionDetail.maintenance.length ? sectionDetail.maintenance.map(({ item, history, workOrders }) => {
+                const p = item?.properties || {};
+                return <div className="section-maintenance-record" key={p.maintenance_id}>
+                  <strong>{escapeHtml(p.activity_type || ("Maintenance " + p.maintenance_id))}</strong>
+                  <span> · {escapeHtml(p.status || "unknown")} · {escapeHtml(p.priority || "unclassified")}</span>
+                  <div>Estimated: {(Number(p.estimated_cost) || 0).toLocaleString()} · Actual: {(Number(p.actual_cost) || 0).toLocaleString()}</div>
+                  <div>History entries: {history.length} · Work orders: {workOrders.length}</div>
+                  {workOrders.length ? <ul>{workOrders.map((order, index) => <li key={order?.work_order_id || index}>WO {escapeHtml(order?.order_number || String(order?.work_order_id || ""))}: {escapeHtml(order?.status || "unknown")} · execution {order?.execution ? "recorded" : "not recorded"} · verification {order?.verification?.result || "pending"}</li>)}</ul> : null}
+                </div>;
+              }) : <p>No maintenance records for this section.</p>}
+            </div>
+          )}
+        </aside>
+      )}
     </section>
   );
 }
