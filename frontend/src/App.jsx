@@ -18,6 +18,7 @@ import PhotoAIPanel from "./components/PhotoAIPanel";
 import InspectionDefectForm from "./components/InspectionDefectForm";
 import Reports from "./Reports";
 import WorkOrderManagement from "./WorkOrderManagement";
+import AssetRegister from "./AssetRegister";
 import MaintenancePlanning from "./MaintenancePlanning";
 import ConditionAssessment from "./ConditionAssessment";
 import MaintenanceAnalytics from "./MaintenanceAnalytics";
@@ -392,6 +393,8 @@ function App({ user }) {
         {activeTab === "workflow" && <InspectionWorkflowPanel />}
 
         {activeTab === "workorders" && <WorkOrderManagement />}
+
+        {activeTab === "assets" && <AssetRegister />}
 
         {activeTab === "reports" && <Reports />}
 
