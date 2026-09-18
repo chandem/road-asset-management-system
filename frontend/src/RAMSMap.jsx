@@ -129,6 +129,10 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
   const [selectedSection, setSelectedSection] = useState(null);
   const [sectionDetail, setSectionDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [conditionFilter, setConditionFilter] = useState("all");
+  const [defectSeverityFilter, setDefectSeverityFilter] = useState("all");
+  const [maintenancePriorityFilter, setMaintenancePriorityFilter] = useState("all");
+  const [assetTypeFilter, setAssetTypeFilter] = useState("all");
 
   const roadIds = useMemo(
     () => [...new Set((roadGeoJSON?.features || []).map((f) => f?.properties?.road_id).filter(Boolean))],
@@ -136,15 +140,40 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
   );
 
   const filtered = useMemo(() => {
-    if (selectedRoad === "all") return { roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON, chainageGeoJSON, maintenanceGeoJSON };
-    const id = Number(selectedRoad);
-    const filter = (data) => data ? ({ ...data, features: data.features.filter((f) => Number(f?.properties?.road_id) === id) }) : null;
-    return {
-      roadGeoJSON: filter(roadGeoJSON), gpsGeoJSON: filter(gpsGeoJSON), sectionGeoJSON: filter(sectionGeoJSON),
-      assetGeoJSON: filter(assetGeoJSON), defectGeoJSON: filter(defectGeoJSON),
-      chainageGeoJSON: filter(chainageGeoJSON), maintenanceGeoJSON: filter(maintenanceGeoJSON),
+    const roadFilter = (data) => {
+      if (!data) return null;
+      const id = selectedRoad === "all" ? null : Number(selectedRoad);
+      return { ...data, features: data.features.filter((f) => id == null || Number(f?.properties?.road_id) === id) };
     };
-  }, [selectedRoad, roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON, chainageGeoJSON, maintenanceGeoJSON]);
+    const roadData = roadFilter(roadGeoJSON);
+    const sectionData = roadFilter(sectionGeoJSON);
+    const assetData = roadFilter(assetGeoJSON);
+    const defectData = roadFilter(defectGeoJSON);
+    const maintenanceData = roadFilter(maintenanceGeoJSON);
+    const conditionFilterFn = (feature) => conditionFilter === "all" || conditionCategory(Number(feature?.properties?.condition_rating)).toLowerCase() === conditionFilter;
+    const severityFilterFn = (feature) => defectSeverityFilter === "all" || String(feature?.properties?.severity || "").toLowerCase() === defectSeverityFilter;
+    const priorityFilterFn = (feature) => maintenancePriorityFilter === "all" || String(feature?.properties?.priority || "").toLowerCase() === maintenancePriorityFilter;
+    const assetTypeFilterFn = (feature) => assetTypeFilter === "all" || String(feature?.properties?.asset_type || "").toLowerCase() === assetTypeFilter;
+    return {
+      roadGeoJSON: roadData,
+      gpsGeoJSON: roadFilter(gpsGeoJSON),
+      sectionGeoJSON: sectionData ? { ...sectionData, features: sectionData.features.filter(conditionFilterFn) } : null,
+      assetGeoJSON: assetData ? { ...assetData, features: assetData.features.filter((f) => assetTypeFilterFn(f) && conditionFilterFn(f)) } : null,
+      defectGeoJSON: defectData ? { ...defectData, features: defectData.features.filter(severityFilterFn) } : null,
+      chainageGeoJSON: roadFilter(chainageGeoJSON),
+      maintenanceGeoJSON: maintenanceData ? { ...maintenanceData, features: maintenanceData.features.filter(priorityFilterFn) } : null,
+    };
+  }, [selectedRoad, conditionFilter, defectSeverityFilter, maintenancePriorityFilter, assetTypeFilter, roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON, chainageGeoJSON, maintenanceGeoJSON]);
+
+  const filterOptions = useMemo(() => [...new Set((assetGeoJSON?.features || [])
+    .map((f) => String(f?.properties?.asset_type || "").trim().toLowerCase()).filter(Boolean))].sort(), [assetGeoJSON]);
+
+  const filterCounts = useMemo(() => ({
+    sections: filtered.sectionGeoJSON?.features?.length || 0,
+    assets: filtered.assetGeoJSON?.features?.length || 0,
+    defects: filtered.defectGeoJSON?.features?.length || 0,
+    maintenance: filtered.maintenanceGeoJSON?.features?.length || 0,
+  }), [filtered]);
 
   useEffect(() => {
     let cancelled = false;
@@ -295,6 +324,17 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
           <label>Road<select value={selectedRoad} onChange={(e) => setSelectedRoad(e.target.value)}><option value="all">All roads</option>{roadOptions.map((road) => <option key={road.id} value={road.id}>{road.name}</option>)}</select></label>
           {layerDefinitions.map(([key, label, data]) => <label key={key} title={`Toggle ${label}`}><input type="checkbox" checked={visible[key] ?? true} onChange={() => toggleLayer(key)} />{label} ({data?.features?.length ?? 0})</label>)}
         </div>
+      </div>
+      <div className="map-filter-panel" aria-label="Interactive GIS analysis filters">
+        <strong>Analysis filters</strong>
+        <div className="layer-controls">
+          <label>Condition<select value={conditionFilter} onChange={(e) => setConditionFilter(e.target.value)}><option value="all">All</option><option value="excellent">Excellent</option><option value="good">Good</option><option value="fair">Fair</option><option value="poor">Poor</option><option value="critical">Critical</option></select></label>
+          <label>Defect severity<select value={defectSeverityFilter} onChange={(e) => setDefectSeverityFilter(e.target.value)}><option value="all">All</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+          <label>Maintenance priority<select value={maintenancePriorityFilter} onChange={(e) => setMaintenancePriorityFilter(e.target.value)}><option value="all">All</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+          <label>Asset type<select value={assetTypeFilter} onChange={(e) => setAssetTypeFilter(e.target.value)}><option value="all">All</option>{filterOptions.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
+          <button type="button" onClick={() => { setConditionFilter("all"); setDefectSeverityFilter("all"); setMaintenancePriorityFilter("all"); setAssetTypeFilter("all"); }}>Reset filters</button>
+        </div>
+        <div className="map-filter-counts" aria-live="polite">Showing {filterCounts.sections} sections · {filterCounts.assets} assets · {filterCounts.defects} defects · {filterCounts.maintenance} maintenance activities</div>
       </div>
       <div className="map-legend" aria-label="GIS condition and maintenance priority legend" style={{ display: "flex", gap: 24, flexWrap: "wrap", padding: "10px 0", fontSize: 13 }}>
         <div>
