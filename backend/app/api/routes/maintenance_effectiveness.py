@@ -118,6 +118,7 @@ def road_maintenance_effectiveness(
             select(WorkOrderVerification.result)
             .join(WorkOrder, WorkOrder.work_order_id == WorkOrderVerification.work_order_id)
             .where(WorkOrder.maintenance_id == activity.maintenance_id)
+            .order_by(WorkOrderVerification.verified_at.desc(), WorkOrderVerification.verification_id.desc())
             .limit(1)
         )
         schedule_delay_days = None
