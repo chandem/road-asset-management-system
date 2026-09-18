@@ -9,6 +9,8 @@ import {
   getWorkOrderExecution,
   createWorkOrderExecution,
   updateWorkOrderExecution,
+  getWorkOrderVerification,
+  createWorkOrderVerification,
 } from "./api";
 
 const STATUSES = ["draft", "issued", "in progress", "completed", "cancelled"];
@@ -16,7 +18,7 @@ function today() { return new Date().toISOString().slice(0, 10); }
 
 export default function WorkOrderManagement() {
   const [roads, setRoads] = useState([]), [maintenance, setMaintenance] = useState([]), [workOrders, setWorkOrders] = useState([]);
-  const [history, setHistory] = useState([]), [selectedId, setSelectedId] = useState(null), [execution, setExecution] = useState(null), [statusFilter, setStatusFilter] = useState("all"), [roadFilter, setRoadFilter] = useState("all");
+  const [history, setHistory] = useState([]), [selectedId, setSelectedId] = useState(null), [execution, setExecution] = useState(null), [verification, setVerification] = useState(null), [statusFilter, setStatusFilter] = useState("all"), [roadFilter, setRoadFilter] = useState("all");
   const [showForm, setShowForm] = useState(false), [message, setMessage] = useState(""), [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ maintenance_id: "", order_number: "", issue_date: today(), due_date: "", status: "draft", assigned_to: "", instructions: "" });
 
@@ -51,7 +53,7 @@ export default function WorkOrderManagement() {
     const assignedTo = window.prompt("Assign to contractor/person", order.assigned_to || ""); if (assignedTo === null) return;
     try { await updateWorkOrder(order.work_order_id, { assigned_to: assignedTo.trim() || null }); setMessage("Assignment updated."); await load(); if (selectedId === order.work_order_id) await loadHistory(order.work_order_id); } catch (error) { setMessage(`Assignment error: ${error.message}`); }
   }
-  async function toggleDetails(id) { if (selectedId === id) { setSelectedId(null); setHistory([]); setExecution(null); } else { setSelectedId(id); await loadHistory(id); try { setExecution(await getWorkOrderExecution(id)); } catch (error) { setMessage(`Execution error: ${error.message}`); } } }
+  async function toggleDetails(id) { if (selectedId === id) { setSelectedId(null); setHistory([]); setExecution(null); setVerification(null); } else { setSelectedId(id); await loadHistory(id); try { setExecution(await getWorkOrderExecution(id)); try { setVerification(await getWorkOrderVerification(id)); } catch (error) { setMessage(`Verification error: ${error.message}`); } } catch (error) { setMessage(`Execution error: ${error.message}`); } } }
 
   return <section className="action-panel work-order-management">
     <div className="panel-heading"><div><h2>Work Order Management</h2><p>Create, assign, issue, track, and audit maintenance work orders.</p></div><button type="button" onClick={openCreate}>Create Work Order</button></div>
@@ -90,6 +92,26 @@ export default function WorkOrderManagement() {
         <label className="full-width">Field notes<textarea name="notes" rows="3" defaultValue={execution?.notes || ""} /></label>
         <button type="submit">Save Execution</button>
       </form>
+      {workOrders.find((order) => order.work_order_id === selectedId)?.status === "completed" && <><h3>Completion Verification</h3>
+      <form className="form-grid" onSubmit={async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const payload = Object.fromEntries(formData.entries());
+        payload.completed_quantity = payload.completed_quantity === "" ? null : Number(payload.completed_quantity);
+        payload.gps_latitude = payload.gps_latitude === "" ? null : Number(payload.gps_latitude);
+        payload.gps_longitude = payload.gps_longitude === "" ? null : Number(payload.gps_longitude);
+        try { const saved = await createWorkOrderVerification(selectedId, payload); setVerification(saved); setMessage("Completion verified."); }
+        catch (error) { setMessage(`Verification error: ${error.message}`); }
+      }}>
+        <label>Verified by<input name="verified_by" required defaultValue={verification?.verified_by || ""} /></label>
+        <label>Result<select name="result" defaultValue={verification?.result || "accepted"}><option>accepted</option><option>accepted with observations</option><option>rejected</option></select></label>
+        <label>Completed quantity<input name="completed_quantity" type="number" step="0.001" min="0" defaultValue={verification?.completed_quantity ?? execution?.actual_quantity ?? ""} /></label>
+        <label>Final condition<input name="final_condition" defaultValue={verification?.final_condition || ""} placeholder="Excellent, Good, Fair, Poor, Critical" /></label>
+        <label>GPS latitude<input name="gps_latitude" type="number" step="any" min="-90" max="90" defaultValue={verification?.gps_latitude ?? execution?.gps_latitude ?? ""} /></label>
+        <label>GPS longitude<input name="gps_longitude" type="number" step="any" min="-180" max="180" defaultValue={verification?.gps_longitude ?? execution?.gps_longitude ?? ""} /></label>
+        <label className="full-width">Verification remarks<textarea name="remarks" rows="3" defaultValue={verification?.remarks || ""} /></label>
+        <button type="submit" disabled={Boolean(verification)}>Verify Completion</button>
+      </form></>}
       <h3>Work Order History — #{selectedId}</h3>{history.length ? <div className="table-wrap"><table><thead><tr><th>Action</th><th>User</th><th>Time</th><th>Changes</th></tr></thead><tbody>{history.map((item) => <tr key={item.history_id}><td>{item.action}</td><td>{item.changed_by ?? "—"}</td><td>{item.changed_at}</td><td><pre>{JSON.stringify(item.new_values || {}, null, 2)}</pre></td></tr>)}</tbody></table></div> : <p>No history recorded.</p>}<button type="button" onClick={() => { setSelectedId(null); setHistory([]); }}>Close</button></div>}
     {message && <p className="form-message">{message}</p>}
   </section>;
