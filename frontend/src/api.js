@@ -73,6 +73,12 @@ export function getMaintenanceWorkOrders(maintenanceId) { return request(`/maint
 export function createRoadAsset(roadId, payload) {
   return request(`/roads/${roadId}/assets`, { method: "POST", body: JSON.stringify(payload) });
 }
+export function updateRoadAsset(assetId, payload) {
+  return request(`/assets/${assetId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+export function deleteRoadAsset(assetId) {
+  return request(`/assets/${assetId}`, { method: "DELETE" });
+}
 export function getDefectGeoJSON() { return request("/defects/geojson"); }
 export function getRoadSections(roadId) { return request(`/roads/${roadId}/sections`); }
 export function getChainagePoints(sectionId) { return request(`/sections/${sectionId}/chainage-points`); }
