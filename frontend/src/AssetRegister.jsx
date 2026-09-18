@@ -11,6 +11,7 @@ import {
   getMaintenanceWorkOrders,
   getAssetLifecycleSummary,
   getAssetReplacementPlan,
+  getReplacementPlan,
 } from "./api";
 
 const ASSET_TYPES = [
@@ -41,6 +42,7 @@ export default function AssetRegister() {
   const [assetWorkOrders, setAssetWorkOrders] = useState([]);
   const [assetSummary, setAssetSummary] = useState(null);
   const [replacementPlan, setReplacementPlan] = useState(null);
+  const [networkPlan, setNetworkPlan] = useState(null);
   const [inspectionForm, setInspectionForm] = useState({ inspection_date: new Date().toISOString().slice(0, 10), condition_rating: "", defect_status: "", notes: "" });
   const [form, setForm] = useState({
     road_id: "",
@@ -61,14 +63,16 @@ export default function AssetRegister() {
     setLoading(true);
     setMessage("");
     try {
-      const [roadData, assetData, summary] = await Promise.all([
+      const [roadData, assetData, summary, networkPlanData] = await Promise.all([
         getRoads(),
         listAssets(),
         getDashboardSummary().catch(() => null),
+        getReplacementPlan(),
       ]);
       setRoads(roadData);
       setAssets(assetData);
       setSections(summary?.sections || []);
+      setNetworkPlan(networkPlanData);
     } catch (err) {
       setMessage(err.message || String(err));
     } finally {
@@ -204,6 +208,14 @@ export default function AssetRegister() {
         </button>
       </div>
 
+      {networkPlan?.summary && (
+        <div className="cards report-cards" style={{ marginBottom: 16 }}>
+          <div className="card"><span>Replacement due</span><strong>{networkPlan.summary.replacement_due}</strong></div>
+          <div className="card"><span>Critical</span><strong>{networkPlan.summary.critical}</strong></div>
+          <div className="card"><span>High priority</span><strong>{networkPlan.summary.high}</strong></div>
+          <div className="card"><span>Renewal budget</span><strong>{Number(networkPlan.summary.budget || 0).toLocaleString()} ETB</strong></div>
+        </div>
+      )}
       <div className="stats-grid" style={{ marginBottom: 16 }}>
         <div><strong>{assets.length}</strong><span>Total assets</span></div>
         <div><strong>{typeCounts.bridge || 0}</strong><span>Bridges</span></div>
