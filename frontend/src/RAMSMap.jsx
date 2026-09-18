@@ -62,10 +62,10 @@ function conditionPriority(score, critical, high) {
   return "low";
 }
 
-function sectionStyle(feature) {
+function conditionColor(score) {\n  if (!Number.isFinite(score)) return "#64748b";\n  if (score >= 85) return "#16a34a";\n  if (score >= 70) return "#65a30d";\n  if (score >= 50) return "#eab308";\n  if (score >= 30) return "#f97316";\n  return "#dc2626";\n}\n\nfunction severityColor(severity) {\n  const value = String(severity || "").toLowerCase();\n  return { critical: "#991b1b", high: "#dc2626", medium: "#f59e0b", low: "#16a34a" }[value] || "#64748b";\n}\n\nfunction sectionStyle(feature) {
   const score = Number(feature?.properties?.condition_rating);
   const weight = Number.isFinite(score) ? (score < 30 ? 7 : score < 50 ? 6 : score < 70 ? 5 : 4) : 4;
-  return { weight, dashArray: "4 4", opacity: 0.9 };
+  const color = conditionColor(score);\n  return { color, weight, fillColor: color, fillOpacity: 0.18, dashArray: "4 4", opacity: 0.95 };
 }
 
 function pointStyle(radius) {
@@ -83,7 +83,7 @@ function pointStyle(radius) {
 function maintenanceStyle(feature, latlng) {
   const priority = String(feature?.properties?.priority || "").toLowerCase();
   const radius = { critical: 10, high: 8, medium: 7, low: 6 }[priority] || 6;
-  return L.circleMarker(latlng, { radius, weight: 2, fillOpacity: 0.75 });
+  const color = { critical: "#991b1b", high: "#dc2626", medium: "#f59e0b", low: "#16a34a" }[priority] || "#64748b";\n  return L.circleMarker(latlng, { radius, color, fillColor: color, weight: 2, fillOpacity: 0.78 });
 }
 
 function chainageStyle(feature, latlng) {
@@ -105,7 +105,7 @@ const priorityLegend = [
   ["Low", "small marker"],
 ];
 
-export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON, visible, toggleLayer, loading, onNavigate }) {
+export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON, visible, toggleLayer, loading, onNavigate, onSectionSelect }) {
   const [chainageGeoJSON, setChainageGeoJSON] = useState(null);
   const [maintenanceGeoJSON, setMaintenanceGeoJSON] = useState(null);
   const [selectedRoad, setSelectedRoad] = useState("all");
@@ -284,7 +284,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
         <div>
           <strong>Section condition</strong>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 5 }}>
-            {conditionLegend.map(([label, range, weight]) => <span key={label} title={`${label}: ${range}`} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span aria-hidden="true" style={{ width: 28, borderTop: `${weight}px solid currentColor` }} />{label} ({range})</span>)}
+            {conditionLegend.map(([label, range, color]) => <span key={label} title={`${label}: ${range}`} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span aria-hidden="true" style={{ width: 28, borderTop: `5px solid ${color}` }} />{label} ({range})</span>)}
           </div>
         </div>
         <div>
