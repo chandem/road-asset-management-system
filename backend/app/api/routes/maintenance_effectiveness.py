@@ -8,6 +8,8 @@ from app.core.security import AuthenticatedUser
 from app.db.session import get_db
 from app.models.inspection import Inspection
 from app.models.maintenance_activity import MaintenanceActivity
+from app.models.work_order import WorkOrder
+from app.models.work_order_execution import WorkOrderExecution
 from app.models.road_section import RoadSection
 from pydantic import BaseModel
 
@@ -27,6 +29,14 @@ class MaintenanceEffectivenessItem(BaseModel):
     cost_variance: float
     cost_variance_percent: float | None = None
     status: str
+    planned_quantity: float | None = None
+    actual_quantity: float | None = None
+    quantity_variance: float | None = None
+    quantity_variance_percent: float | None = None
+    planned_date: str | None = None
+    completed_date: str | None = None
+    schedule_delay_days: int | None = None
+    verification_result: str | None = None
 
 
 class MaintenanceEffectivenessResponse(BaseModel):
@@ -92,6 +102,20 @@ def road_maintenance_effectiveness(
         improvement = None if pre is None or post is None else round(post - pre, 2)
         variance = round(actual - estimated, 2)
         variance_percent = None if estimated == 0 else round((variance / estimated) * 100, 2)
+        execution = db.scalar(
+            select(WorkOrderExecution)
+            .join(WorkOrder, WorkOrder.work_order_id == WorkOrderExecution.work_order_id)
+            .where(WorkOrder.maintenance_id == activity.maintenance_id)
+            .order_by(WorkOrderExecution.updated_at.desc(), WorkOrderExecution.execution_id.desc())
+            .limit(1)
+        )
+        planned_quantity = None if execution is None or execution.planned_quantity is None else float(execution.planned_quantity)
+        actual_quantity = None if execution is None or execution.actual_quantity is None else float(execution.actual_quantity)
+        quantity_variance = None if planned_quantity is None or actual_quantity is None else round(actual_quantity - planned_quantity, 3)
+        quantity_variance_percent = None if planned_quantity in (None, 0) or quantity_variance is None else round((quantity_variance / planned_quantity) * 100, 2)
+        schedule_delay_days = None
+        if activity.planned_date and activity.completed_date:
+            schedule_delay_days = max((activity.completed_date - activity.planned_date).days, 0)
         rows.append(
             MaintenanceEffectivenessItem(
                 maintenance_id=activity.maintenance_id,
@@ -105,6 +129,13 @@ def road_maintenance_effectiveness(
                 cost_variance=variance,
                 cost_variance_percent=variance_percent,
                 status=activity.status,
+                planned_quantity=planned_quantity,
+                actual_quantity=actual_quantity,
+                quantity_variance=quantity_variance,
+                quantity_variance_percent=quantity_variance_percent,
+                planned_date=activity.planned_date.isoformat() if activity.planned_date else None,
+                completed_date=activity.completed_date.isoformat() if activity.completed_date else None,
+                schedule_delay_days=schedule_delay_days,
             )
         )
 
