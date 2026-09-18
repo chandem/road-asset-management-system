@@ -1,7 +1,7 @@
 from typing import Optional
 
 from geoalchemy2 import Geometry
-from sqlalchemy import BigInteger, ForeignKey, Numeric, String, Text
+from sqlalchemy import BigInteger, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.road import Base
@@ -23,4 +23,9 @@ class RoadAsset(Base):
     chainage_km: Mapped[Optional[float]] = mapped_column(Numeric(12, 3))
     description: Mapped[Optional[str]] = mapped_column(Text)
     condition_rating: Mapped[Optional[float]] = mapped_column(Numeric(5, 2))
+    criticality: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    commissioning_year: Mapped[Optional[int]] = mapped_column(Integer)
+    expected_life_years: Mapped[Optional[int]] = mapped_column(Integer)
+    replacement_cost: Mapped[Optional[float]] = mapped_column(Numeric(14, 2))
+    replacement_threshold: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, default=40)
     geometry: Mapped[object] = mapped_column(Geometry("GEOMETRY", srid=4326), nullable=True)
