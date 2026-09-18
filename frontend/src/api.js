@@ -59,6 +59,14 @@ export function createAssetInspection(assetId, payload) { return request(`/asset
 export function getAssetDefects(assetId) { return request(`/assets/${assetId}/defects`); }
 export function getAssetMaintenance(assetId) { return request(`/assets/${assetId}/maintenance`); }
 export function getAssetLifecycleSummary(assetId) { return request(`/assets/${assetId}/lifecycle-summary`); }
+export function getAssetReplacementPlan(assetId) { return request(`/assets/${assetId}/replacement-plan`); }
+export function getReplacementPlan(params = {}) {
+  const q = new URLSearchParams();
+  if (params.road_id) q.set("road_id", params.road_id);
+  if (params.priority) q.set("priority", params.priority);
+  const qs = q.toString();
+  return request(`/assets/replacement-plan${qs ? `?${qs}` : ""}`);
+}
 export function getMaintenanceWorkOrders(maintenanceId) { return request(`/maintenance/${maintenanceId}/work-orders`); }
 export function createRoadAsset(roadId, payload) {
   return request(`/roads/${roadId}/assets`, { method: "POST", body: JSON.stringify(payload) });
