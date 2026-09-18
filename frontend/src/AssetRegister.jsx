@@ -6,6 +6,9 @@ import {
   listAssets,
   getAssetInspections,
   createAssetInspection,
+  getAssetDefects,
+  getAssetMaintenance,
+  getMaintenanceWorkOrders,
 } from "./api";
 
 const ASSET_TYPES = [
@@ -31,6 +34,9 @@ export default function AssetRegister() {
   const [saving, setSaving] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [assetInspections, setAssetInspections] = useState([]);
+  const [assetDefects, setAssetDefects] = useState([]);
+  const [assetMaintenance, setAssetMaintenance] = useState([]);
+  const [assetWorkOrders, setAssetWorkOrders] = useState([]);
   const [inspectionForm, setInspectionForm] = useState({ inspection_date: new Date().toISOString().slice(0, 10), condition_rating: "", defect_status: "", notes: "" });
   const [form, setForm] = useState({
     road_id: "",
@@ -331,7 +337,7 @@ export default function AssetRegister() {
       {selectedAsset && (
         <div className="report-block" style={{ marginTop: 16 }}>
           <div className="panel-heading" style={{ display: "flex", justifyContent: "space-between" }}>
-            <div><h3>Asset lifecycle — {selectedAsset.asset_code || `Asset #${selectedAsset.asset_id}`}</h3><p>Inspection history and current condition.</p></div>
+            <div><h3>Asset lifecycle — {selectedAsset.asset_code || `Asset #${selectedAsset.asset_id}`}</h3><p>Asset → inspection → defect → maintenance → work order lifecycle.</p></div>
             <button type="button" onClick={() => setSelectedAsset(null)}>Close</button>
           </div>
           <form onSubmit={saveAssetInspection} className="form-grid">
@@ -342,6 +348,9 @@ export default function AssetRegister() {
             <div className="button-row"><button type="submit">Record inspection</button></div>
           </form>
           <div className="table-wrap" style={{marginTop:12}}><table><thead><tr><th>Date</th><th>Condition</th><th>Defect</th><th>Notes</th></tr></thead><tbody>{assetInspections.length ? assetInspections.map(i => <tr key={i.asset_inspection_id}><td>{i.inspection_date}</td><td>{i.condition_rating ?? "—"}</td><td>{i.defect_status || "—"}</td><td>{i.notes || "—"}</td></tr>) : <tr><td colSpan={4}>No inspections recorded.</td></tr>}</tbody></table></div>
+          <div className="table-wrap" style={{marginTop:16}}><h4>Defects / failures ({assetDefects.length})</h4><table><thead><tr><th>ID</th><th>Type</th><th>Severity</th><th>Chainage</th><th>Detected by</th></tr></thead><tbody>{assetDefects.length ? assetDefects.map(d => <tr key={d.defect_id}><td>{d.defect_id}</td><td>{d.defect_type}</td><td>{d.severity || "—"}</td><td>{d.chainage_km ?? "—"}</td><td>{d.detected_by}</td></tr>) : <tr><td colSpan={5}>No linked defects recorded.</td></tr>}</tbody></table></div>
+          <div className="table-wrap" style={{marginTop:16}}><h4>Maintenance history ({assetMaintenance.length})</h4><table><thead><tr><th>ID</th><th>Activity</th><th>Priority</th><th>Status</th><th>Planned</th><th>Actual cost</th></tr></thead><tbody>{assetMaintenance.length ? assetMaintenance.map(m => <tr key={m.maintenance_id}><td>{m.maintenance_id}</td><td>{m.activity_type}</td><td>{m.priority || "—"}</td><td>{m.status}</td><td>{m.planned_date || "—"}</td><td>{m.actual_cost ?? "—"}</td></tr>) : <tr><td colSpan={6}>No linked maintenance activities.</td></tr>}</tbody></table></div>
+          <div className="table-wrap" style={{marginTop:16}}><h4>Work orders ({assetWorkOrders.length})</h4><table><thead><tr><th>Order</th><th>Issue date</th><th>Due</th><th>Status</th><th>Assigned to</th></tr></thead><tbody>{assetWorkOrders.length ? assetWorkOrders.map(w => <tr key={w.work_order_id}><td>{w.order_number}</td><td>{w.issue_date}</td><td>{w.due_date || "—"}</td><td>{w.status}</td><td>{w.assigned_to || "—"}</td></tr>) : <tr><td colSpan={5}>No linked work orders.</td></tr>}</tbody></table></div>
         </div>
       )}
       {message && <p className="form-message">{message}</p>}
