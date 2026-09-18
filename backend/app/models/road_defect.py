@@ -16,6 +16,10 @@ class RoadDefect(Base):
         BigInteger,
         ForeignKey("rams.inspections.inspection_id", ondelete="CASCADE"),
     )
+    asset_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("rams.road_assets.asset_id", ondelete="SET NULL"),
+    )
     section_id: Mapped[Optional[int]] = mapped_column(
         BigInteger,
         ForeignKey("rams.road_sections.section_id", ondelete="SET NULL"),
