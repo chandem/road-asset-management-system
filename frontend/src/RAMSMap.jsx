@@ -91,11 +91,11 @@ function chainageStyle(feature, latlng) {
 }
 
 const conditionLegend = [
-  ["Excellent", "≥ 85", "2"],
-  ["Good", "70–84", "4"],
-  ["Fair", "50–69", "5"],
-  ["Poor", "30–49", "6"],
-  ["Critical", "< 30", "7"],
+  ["Excellent", "≥ 85", "#16a34a"],
+  ["Good", "70–84", "#65a30d"],
+  ["Fair", "50–69", "#eab308"],
+  ["Poor", "30–49", "#f97316"],
+  ["Critical", "< 30", "#dc2626"],
 ];
 
 const priorityLegend = [
