@@ -10,6 +10,7 @@ import {
   getAssetMaintenance,
   getMaintenanceWorkOrders,
   getAssetLifecycleSummary,
+  getAssetReplacementPlan,
 } from "./api";
 
 const ASSET_TYPES = [
@@ -39,6 +40,7 @@ export default function AssetRegister() {
   const [assetMaintenance, setAssetMaintenance] = useState([]);
   const [assetWorkOrders, setAssetWorkOrders] = useState([]);
   const [assetSummary, setAssetSummary] = useState(null);
+  const [replacementPlan, setReplacementPlan] = useState(null);
   const [inspectionForm, setInspectionForm] = useState({ inspection_date: new Date().toISOString().slice(0, 10), condition_rating: "", defect_status: "", notes: "" });
   const [form, setForm] = useState({
     road_id: "",
@@ -48,6 +50,11 @@ export default function AssetRegister() {
     chainage_km: "",
     condition_rating: "",
     description: "",
+    criticality: 3,
+    commissioning_year: "",
+    expected_life_years: "",
+    replacement_cost: "",
+    replacement_threshold: 40,
   });
 
   async function load() {
@@ -103,11 +110,12 @@ export default function AssetRegister() {
   async function openAsset(asset) {
     setSelectedAsset(asset);
     try {
-      const [inspections, defects, maintenance, lifecycleSummary] = await Promise.all([
+      const [inspections, defects, maintenance, lifecycleSummary, replacementPlanData] = await Promise.all([
         getAssetInspections(asset.asset_id),
         getAssetDefects(asset.asset_id),
         getAssetMaintenance(asset.asset_id),
         getAssetLifecycleSummary(asset.asset_id),
+        getAssetReplacementPlan(asset.asset_id),
       ]);
       const workOrderGroups = await Promise.all(
         maintenance.map(m => getMaintenanceWorkOrders(m.maintenance_id).catch(() => []))
@@ -117,6 +125,7 @@ export default function AssetRegister() {
       setAssetMaintenance(maintenance);
       setAssetWorkOrders(workOrderGroups.flat());
       setAssetSummary(lifecycleSummary);
+      setReplacementPlan(replacementPlanData);
     } catch (err) {
       setMessage(err.message || String(err));
     }
@@ -152,6 +161,11 @@ export default function AssetRegister() {
         section_id: form.section_id ? Number(form.section_id) : null,
         chainage_km: form.chainage_km !== "" ? Number(form.chainage_km) : null,
         condition_rating: form.condition_rating !== "" ? Number(form.condition_rating) : null,
+        criticality: Number(form.criticality),
+        commissioning_year: form.commissioning_year !== "" ? Number(form.commissioning_year) : null,
+        expected_life_years: form.expected_life_years !== "" ? Number(form.expected_life_years) : null,
+        replacement_cost: form.replacement_cost !== "" ? Number(form.replacement_cost) : null,
+        replacement_threshold: Number(form.replacement_threshold),
         description: form.description || null,
       });
       setMessage("Asset saved.");
@@ -164,6 +178,11 @@ export default function AssetRegister() {
         chainage_km: "",
         condition_rating: "",
         description: "",
+        criticality: 3,
+        commissioning_year: "",
+        expected_life_years: "",
+        replacement_cost: "",
+        replacement_threshold: 40,
       });
       await load();
     } catch (err) {
@@ -295,6 +314,26 @@ export default function AssetRegister() {
                 onChange={(e) => updateForm("condition_rating", e.target.value)}
               />
             </label>
+            <label>
+              Criticality (1–5)
+              <input type="number" min="1" max="5" value={form.criticality} onChange={(e) => updateForm("criticality", e.target.value)} />
+            </label>
+            <label>
+              Commissioning year
+              <input type="number" min="1900" max="2100" value={form.commissioning_year} onChange={(e) => updateForm("commissioning_year", e.target.value)} placeholder="e.g. 2018" />
+            </label>
+            <label>
+              Expected life (years)
+              <input type="number" min="1" max="200" value={form.expected_life_years} onChange={(e) => updateForm("expected_life_years", e.target.value)} placeholder="e.g. 50" />
+            </label>
+            <label>
+              Replacement cost
+              <input type="number" min="0" step="0.01" value={form.replacement_cost} onChange={(e) => updateForm("replacement_cost", e.target.value)} />
+            </label>
+            <label>
+              Replacement threshold (0–100)
+              <input type="number" min="0" max="100" step="0.1" value={form.replacement_threshold} onChange={(e) => updateForm("replacement_threshold", e.target.value)} />
+            </label>
             <label style={{ gridColumn: "1 / -1" }}>
               Description
               <textarea
@@ -329,9 +368,9 @@ export default function AssetRegister() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={8}>Loading…</td></tr>
+              <tr><td colSpan={9}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={8}>No assets match the filters.</td></tr>
+              <tr><td colSpan={9}>No assets match the filters.</td></tr>
             ) : (
               filtered.map((a) => {
                 const road = roadById.get(Number(a.road_id));
@@ -359,6 +398,17 @@ export default function AssetRegister() {
             <div><h3>Asset lifecycle — {selectedAsset.asset_code || `Asset #${selectedAsset.asset_id}`}</h3><p>Asset → inspection → defect → maintenance → work order lifecycle.</p></div>
             <button type="button" onClick={() => setSelectedAsset(null)}>Close</button>
           </div>
+          {replacementPlan && <div className="report-block" style={{margin:"12px 0"}}>
+            <h4>Replacement planning</h4>
+            <div className="stats-grid">
+              <div><strong>{replacementPlan.replacement_priority}</strong><span>Priority</span></div>
+              <div><strong>{replacementPlan.criticality}</strong><span>Criticality</span></div>
+              <div><strong>{replacementPlan.age_years ?? "—"}</strong><span>Age (years)</span></div>
+              <div><strong>{replacementPlan.remaining_useful_life_years ?? "—"}</strong><span>Remaining life</span></div>
+              <div><strong>{replacementPlan.replacement_cost == null ? "—" : Number(replacementPlan.replacement_cost).toLocaleString()}</strong><span>Replacement cost</span></div>
+            </div>
+            <p>{replacementPlan.replacement_due ? "Replacement is currently due based on condition or expected service life." : "Replacement is not currently due based on the configured condition threshold and expected service life."}</p>
+          </div>}
           {assetSummary && <div className="stats-grid" style={{margin:"12px 0"}}><div><strong>{assetSummary.condition.current ?? "—"}</strong><span>Current condition</span></div><div><strong>{assetSummary.condition.trend ?? "—"}</strong><span>Condition change</span></div><div><strong>{assetSummary.failures.defect_count}</strong><span>Defects / failures</span></div><div><strong>{assetSummary.maintenance.actual_cost.toLocaleString()}</strong><span>Maintenance cost</span></div><div><strong>{assetSummary.work_orders.open}</strong><span>Open work orders</span></div></div>}
           <form onSubmit={saveAssetInspection} className="form-grid">
             <label>Date<input type="date" value={inspectionForm.inspection_date} onChange={e => setInspectionForm(f => ({...f, inspection_date:e.target.value}))} required /></label>
