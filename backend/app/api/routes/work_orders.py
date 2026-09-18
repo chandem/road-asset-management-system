@@ -32,6 +32,16 @@ def _values(order: WorkOrder) -> dict:
     }
 
 
+WORK_ORDER_TRANSITIONS = {
+    "draft": {"issued", "cancelled"},
+    "issued": {"in progress", "cancelled"},
+    "in progress": {"completed", "cancelled"},
+    "completed": {"closed", "in progress"},
+    "closed": set(),
+    "cancelled": set(),
+}
+
+
 def _add_history(db: Session, order: WorkOrder, user_id: int | None, action: str, old_values=None, new_values=None):
     db.add(WorkOrderHistory(
         work_order_id=order.work_order_id,
@@ -123,6 +133,13 @@ def update_work_order(
         raise HTTPException(status_code=404, detail="Work order not found")
 
     data = payload.model_dump(exclude_unset=True)
+    if "status" in data and data["status"] != order.status:
+        allowed = WORK_ORDER_TRANSITIONS.get(order.status, set())
+        if data["status"] not in allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid work-order transition: {order.status} -> {data['status']}",
+            )
     issue_date = data.get("issue_date", order.issue_date)
     due_date = data.get("due_date", order.due_date)
     if due_date is not None and due_date < issue_date:
@@ -166,6 +183,8 @@ def create_execution(work_order_id: int, payload: WorkOrderExecutionCreate, db: 
     order = db.get(WorkOrder, work_order_id)
     if order is None:
         raise HTTPException(status_code=404, detail="Work order not found")
+    if order.status != "in progress":
+        raise HTTPException(status_code=400, detail="Work order must be in progress before execution is recorded")
     if db.scalar(select(WorkOrderExecution).where(WorkOrderExecution.work_order_id == work_order_id)):
         raise HTTPException(status_code=409, detail="Work order execution already exists")
     execution = WorkOrderExecution(
@@ -199,9 +218,14 @@ def create_execution(work_order_id: int, payload: WorkOrderExecutionCreate, db: 
 
 @router.patch("/work-orders/{work_order_id}/execution", response_model=WorkOrderExecutionResponse)
 def update_execution(work_order_id: int, payload: WorkOrderExecutionUpdate, db: DbSession, current_user: EngineerUser):
+    order = db.get(WorkOrder, work_order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Work order not found")
     execution = db.scalar(select(WorkOrderExecution).where(WorkOrderExecution.work_order_id == work_order_id))
     if execution is None:
         raise HTTPException(status_code=404, detail="Work order execution not found")
+    if order.status not in {"in progress", "completed"}:
+        raise HTTPException(status_code=400, detail="Execution can only be updated while work order is in progress or completed")
     old_execution = {
         "started_at": execution.started_at.isoformat() if execution.started_at else None,
         "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
@@ -267,6 +291,19 @@ def create_verification(work_order_id: int, payload: WorkOrderVerificationCreate
     )
     db.add(verification)
     try:
+        old_status = order.status
+        if payload.result == "rejected":
+            order.status = "in progress"
+        elif payload.result in {"accepted", "accepted with observations"}:
+            order.status = "closed"
+        _add_history(
+            db,
+            order,
+            current_user.user_id,
+            "verification_created",
+            {"status": old_status},
+            {"status": order.status, "result": payload.result, "verified_by": payload.verified_by},
+        )
         db.commit()
         db.refresh(verification)
     except Exception:
