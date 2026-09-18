@@ -218,8 +218,12 @@ def create_verification(work_order_id: int, payload: WorkOrderVerificationCreate
         raise HTTPException(status_code=404, detail="Work order not found")
     if order.status != "completed":
         raise HTTPException(status_code=400, detail="Only completed work orders can be verified")
-    if db.scalar(select(WorkOrderVerification).where(WorkOrderVerification.work_order_id == work_order_id)):
+    existing = db.scalar(select(WorkOrderVerification).where(WorkOrderVerification.work_order_id == work_order_id))
+    if existing:
         raise HTTPException(status_code=409, detail="Work order verification already exists")
+    execution = db.scalar(select(WorkOrderExecution).where(WorkOrderExecution.work_order_id == work_order_id))
+    if execution is None or execution.completed_at is None:
+        raise HTTPException(status_code=400, detail="Work order execution must be completed before verification")
     verification = WorkOrderVerification(
         work_order_id=work_order_id,
         verified_at=payload.verified_at or datetime.now(timezone.utc),
