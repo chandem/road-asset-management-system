@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.security import AuthenticatedUser, FieldStaffUser
 from app.db.session import get_db
 from app.models.inspection import Inspection
+from app.models.road_asset import RoadAsset
 from app.models.road_defect import RoadDefect
 from app.models.road_section import RoadSection
 from app.schemas.road_defect import RoadDefectCreate, RoadDefectResponse
@@ -22,6 +23,7 @@ def defects_geojson(db: DbSession, current_user: AuthenticatedUser):
             RoadDefect.defect_id,
             RoadDefect.inspection_id,
             RoadDefect.section_id,
+            RoadDefect.asset_id,
             RoadDefect.defect_type,
             RoadDefect.severity,
             RoadDefect.chainage_km,
@@ -44,6 +46,7 @@ def defects_geojson(db: DbSession, current_user: AuthenticatedUser):
                     "defect_id": defect_id,
                     "inspection_id": inspection_id,
                     "section_id": section_id,
+                    "asset_id": asset_id,
                     "defect_type": defect_type,
                     "severity": severity,
                     "chainage_km": float(chainage_km) if chainage_km is not None else None,
@@ -96,6 +99,15 @@ def create_defect(
             return existing
 
     section_id = payload.section_id or inspection.section_id
+    asset = None
+    if payload.asset_id is not None:
+        asset = db.get(RoadAsset, payload.asset_id)
+        if asset is None:
+            raise HTTPException(status_code=400, detail="Road asset not found")
+        if section_id is not None and asset.section_id is not None and asset.section_id != section_id:
+            raise HTTPException(status_code=400, detail="Asset does not belong to the selected section")
+        if inspection.section_id is not None and asset.section_id is not None and asset.section_id != inspection.section_id:
+            raise HTTPException(status_code=400, detail="Asset does not belong to the inspection section")
     section = None
     if section_id is not None:
         section = db.get(RoadSection, section_id)
@@ -116,6 +128,7 @@ def create_defect(
 
     defect = RoadDefect(
         inspection_id=inspection_id,
+        asset_id=payload.asset_id,
         section_id=section_id,
         client_id=payload.client_id,
         defect_type=payload.defect_type,
