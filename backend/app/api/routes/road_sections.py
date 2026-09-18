@@ -67,6 +67,45 @@ def sections_geojson(road_id: int, db: DbSession, current_user: AuthenticatedUse
     return {"type": "FeatureCollection", "features": features}
 
 
+@router.get("/sections/geojson")
+def all_sections_geojson(db: DbSession, current_user: AuthenticatedUser):
+    """Global FeatureCollection of all road sections (avoids N+1 per-road fetches)."""
+    rows = db.execute(
+        select(
+            RoadSection.section_id,
+            RoadSection.road_id,
+            RoadSection.section_code,
+            RoadSection.start_chainage,
+            RoadSection.end_chainage,
+            RoadSection.length_km,
+            RoadSection.surface_type,
+            RoadSection.condition_rating,
+            func.ST_AsGeoJSON(RoadSection.geometry),
+        )
+        .order_by(RoadSection.road_id, RoadSection.start_chainage)
+    ).all()
+
+    features = []
+    for row in rows:
+        geometry = json.loads(row[8]) if row[8] else None
+        features.append({
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": {
+                "section_id": row[0],
+                "road_id": row[1],
+                "section_code": row[2],
+                "start_chainage": float(row[3]) if row[3] is not None else None,
+                "end_chainage": float(row[4]) if row[4] is not None else None,
+                "length_km": float(row[5]) if row[5] is not None else None,
+                "surface_type": row[6],
+                "condition_rating": float(row[7]) if row[7] is not None else None,
+            },
+        })
+
+    return {"type": "FeatureCollection", "features": features}
+
+
 @router.get("/sections/{section_id}", response_model=RoadSectionResponse)
 def get_section(section_id: int, db: DbSession, current_user: AuthenticatedUser):
     section = db.get(RoadSection, section_id)
@@ -89,10 +128,12 @@ def create_section(
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
 
+    if payload.end_chainage <= payload.start_chainage:
+        raise HTTPException(status_code=400, detail="end_chainage must be greater than start_chainage")
+
+    geometry = None
     if payload.geometry_wkt:
         geometry = func.ST_GeomFromText(payload.geometry_wkt, 4326)
-    else:
-        geometry = None
 
     section = RoadSection(
         road_id=road_id,
