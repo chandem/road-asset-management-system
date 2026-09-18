@@ -124,3 +124,7 @@ export function getAIStatus() { return request("/ai/status"); }
 export function runAIDetection(imageId) { return request(`/images/${imageId}/ai-detect`, { method: "POST" }); }
 export function getAIDetections(imageId) { return request(`/images/${imageId}/ai-detections`); }
 export { API_BASE };
+
+export function getWorkOrderExecution(workOrderId) { return request(`/work-orders/${workOrderId}/execution`); }
+export function createWorkOrderExecution(workOrderId, payload) { return request(`/work-orders/${workOrderId}/execution`, { method: "POST", body: JSON.stringify(payload) }); }
+export function updateWorkOrderExecution(workOrderId, payload) { return request(`/work-orders/${workOrderId}/execution`, { method: "PATCH", body: JSON.stringify(payload) }); }
