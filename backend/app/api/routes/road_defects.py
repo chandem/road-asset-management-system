@@ -70,6 +70,17 @@ def list_defects(inspection_id: int, db: DbSession, current_user: AuthenticatedU
     ).all()
 
 
+@router.get("/assets/{asset_id}/defects", response_model=list[RoadDefectResponse])
+def list_asset_defects(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
+    if db.get(RoadAsset, asset_id) is None:
+        raise HTTPException(status_code=404, detail="Road asset not found")
+    return db.scalars(
+        select(RoadDefect)
+        .where(RoadDefect.asset_id == asset_id)
+        .order_by(RoadDefect.chainage_km, RoadDefect.defect_id)
+    ).all()
+
+
 @router.get("/defects/{defect_id}", response_model=RoadDefectResponse)
 def get_defect(defect_id: int, db: DbSession, current_user: AuthenticatedUser):
     defect = db.get(RoadDefect, defect_id)
