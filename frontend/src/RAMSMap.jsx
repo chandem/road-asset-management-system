@@ -90,6 +90,21 @@ function chainageStyle(feature, latlng) {
   return L.circleMarker(latlng, { radius: 4, weight: 1, fillOpacity: 0.9 });
 }
 
+const conditionLegend = [
+  ["Excellent", "≥ 85", "2"],
+  ["Good", "70–84", "4"],
+  ["Fair", "50–69", "5"],
+  ["Poor", "30–49", "6"],
+  ["Critical", "< 30", "7"],
+];
+
+const priorityLegend = [
+  ["Critical", "largest marker"],
+  ["High", "large marker"],
+  ["Medium", "medium marker"],
+  ["Low", "small marker"],
+];
+
 export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON, visible, toggleLayer, loading }) {
   const [chainageGeoJSON, setChainageGeoJSON] = useState(null);
   const [maintenanceGeoJSON, setMaintenanceGeoJSON] = useState(null);
@@ -182,6 +197,20 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
         <div className="layer-controls" aria-label="Map filters and layers">
           <label>Road<select value={selectedRoad} onChange={(e) => setSelectedRoad(e.target.value)}><option value="all">All roads</option>{roadOptions.map((road) => <option key={road.id} value={road.id}>{road.name}</option>)}</select></label>
           {layerDefinitions.map(([key, label, data]) => <label key={key} title={`Toggle ${label}`}><input type="checkbox" checked={visible[key] ?? true} onChange={() => toggleLayer(key)} />{label} ({data?.features?.length ?? 0})</label>)}
+        </div>
+      </div>
+      <div className="map-legend" aria-label="GIS condition and maintenance priority legend" style={{ display: "flex", gap: 24, flexWrap: "wrap", padding: "10px 0", fontSize: 13 }}>
+        <div>
+          <strong>Section condition</strong>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 5 }}>
+            {conditionLegend.map(([label, range, weight]) => <span key={label} title={`${label}: ${range}`} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span aria-hidden="true" style={{ width: 28, borderTop: `${weight}px solid currentColor` }} />{label} ({range})</span>)}
+          </div>
+        </div>
+        <div>
+          <strong>Maintenance priority</strong>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 5 }}>
+            {priorityLegend.map(([label, size]) => <span key={label}>{label} · {size}</span>)}
+          </div>
         </div>
       </div>
       <MapContainer center={defaultCenter} zoom={7} className="map">
