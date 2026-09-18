@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import "leaflet/dist/leaflet.css";
 import {
   createDefect, createInspection, createMaintenance, getAIDetections, getAIStatus, getDashboardSummary, getDashboardAttention, getDashboardKPIs, getDefectGeoJSON, getGPSTrackGeoJSON,
-  getRoadAssetGeoJSON, getRoadGeoJSON, getRoadMaintenance, getRoadSectionGeoJSON,
+  getAssetsGeoJSON, getRoadGeoJSON, getRoadMaintenance, getSectionsGeoJSON,
   runAIDetection, uploadImage,
 } from "./api";
 import FieldGPS from "./FieldGPS";
@@ -13,6 +13,7 @@ import RAMSMap from "./RAMSMap";
 import SummaryCards from "./components/SummaryCards";
 import ReportPanel from "./components/ReportPanel";
 import AttentionPanel from "./components/AttentionPanel";
+import KPIDashboard from "./components/KPIDashboard";
 import MaintenanceSection from "./components/MaintenanceSection";
 import PhotoAIPanel from "./components/PhotoAIPanel";
 import InspectionDefectForm from "./components/InspectionDefectForm";
@@ -26,7 +27,6 @@ import MaintenanceAnalytics from "./MaintenanceAnalytics";
 import MaintenanceEffectiveness from "./MaintenanceEffectiveness";
 import MaintenanceDecisionSupport from "./MaintenanceDecisionSupport";
 import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
-import SectionDetails from "./SectionDetails";
 import { canAccessTab, filterNavGroups, normalizeRole } from "./roles";
 
 function App({ user }) {
@@ -49,7 +49,6 @@ function App({ user }) {
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
   const [maintenanceForm, setMaintenanceForm] = useState({ section_id: "", chainage_km: "", activity_type: "", priority: "medium", planned_date: "", completed_date: "", estimated_cost: "", actual_cost: "", contractor: "", status: "planned", description: "" });
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
-  const [selectedMapSection, setSelectedMapSection] = useState(null);
 
   useEffect(() => {
     const on = () => setOnline(true); const off = () => setOnline(false);
@@ -83,28 +82,12 @@ function App({ user }) {
         setAttention(null);
       }
 
-      setSectionGeoJSON({ type: "FeatureCollection", features: [] });
-      setAssetGeoJSON({ type: "FeatureCollection", features: [] });
-      if (summary.roads?.length) {
-        try {
-          const sectionLayers = await Promise.all(
-            summary.roads.map((r) => soft(getRoadSectionGeoJSON(r.road_id))),
-          );
-          const assetLayers = await Promise.all(
-            summary.roads.map((r) => soft(getRoadAssetGeoJSON(r.road_id))),
-          );
-          setSectionGeoJSON({
-            type: "FeatureCollection",
-            features: sectionLayers.flatMap((g) => g?.features || []),
-          });
-          setAssetGeoJSON({
-            type: "FeatureCollection",
-            features: assetLayers.flatMap((g) => g?.features || []),
-          });
-        } catch (_) {
-          /* map layers optional */
-        }
-      }
+      const [sg, ag] = await Promise.all([
+        soft(getSectionsGeoJSON()),
+        soft(getAssetsGeoJSON()),
+      ]);
+      setSectionGeoJSON(sg || { type: "FeatureCollection", features: [] });
+      setAssetGeoJSON(ag || { type: "FeatureCollection", features: [] });
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -354,25 +337,15 @@ function App({ user }) {
         {activeTab === "overview" && (
           <>
             <SummaryCards loading={loading} counts={summaryCounts} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} />
-            {kpis && (
-              <section className="cards" aria-label="RAMS performance KPIs">
-                <div className="card"><span>Maintenance completion</span><strong>{kpis.maintenance?.completion_rate_percent ?? "—"}%</strong></div>
-                <div className="card"><span>Overdue maintenance</span><strong>{kpis.maintenance?.overdue ?? 0}</strong></div>
-                <div className="card"><span>Cost variance</span><strong>{kpis.cost?.variance_percent ?? "—"}%</strong></div>
-                <div className="card"><span>Verified work orders</span><strong>{kpis.work_orders?.verified ?? 0}</strong></div>
-              </section>
-            )}
-            <AttentionPanel attention={attention} loading={loading} onSectionSelect={setSelectedMapSection} />
+            <KPIDashboard kpis={kpis} loading={loading} />
+            <AttentionPanel attention={attention} loading={loading} onNavigate={setActiveTab} />
             <ReportPanel report={report} onRefresh={loadDashboard} />
-            <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} onNavigate={setActiveTab} />
+            <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
           </>
         )}
 
         {activeTab === "map" && (
-          <>
-            <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} onSectionSelect={setSelectedMapSection} />
-            <SectionDetails section={selectedMapSection} defects={(defectGeoJSON?.features || []).filter((f) => Number(f?.properties?.section_id) === Number(selectedMapSection?.properties?.section_id))} onClose={() => setSelectedMapSection(null)} />
-          </>
+          <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
         )}
 
         {activeTab === "field" && (
