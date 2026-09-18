@@ -306,7 +306,8 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
               </div>
               <h4>Defect history</h4>
               {sectionDetail.defects.length ? <ul>{sectionDetail.defects.slice(0, 10).map((item, index) => <li key={item?.properties?.defect_id || index}><strong>{escapeHtml(item?.properties?.defect_type || "Defect")}</strong> — {escapeHtml(item?.properties?.severity || "unclassified")}{item?.properties?.chainage_km != null ? " · Ch. " + item.properties.chainage_km : ""}</li>)}</ul> : <p>No recorded defects for this section.</p>}
-              <div className="actions" style={{ marginBottom: 12 }}><button type="button" onClick={() => onNavigate?.("maintenance")}>Open Maintenance</button><button type="button" onClick={() => onNavigate?.("workorders")}>Open Work Orders</button></div>\n              <h4>Maintenance & work-order history</h4>
+              <div className="actions" style={{ marginBottom: 12 }}><button type="button" onClick={() => onNavigate?.("maintenance")}>Open Maintenance</button><button type="button" onClick={() => onNavigate?.("workorders")}>Open Work Orders</button></div>
+              <h4>Maintenance & work-order history</h4>
               {sectionDetail.maintenance.length ? sectionDetail.maintenance.map(({ item, history, workOrders }) => {
                 const p = item?.properties || {};
                 return <div className="section-maintenance-record" key={p.maintenance_id}>
