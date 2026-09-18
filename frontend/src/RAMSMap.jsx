@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getChainagePoints, getRoadMaintenanceGeoJSON, getMaintenanceHistory, getMaintenanceWorkOrders, getWorkOrderExecution, getWorkOrderVerification } from "./api";
+import { getChainagePoints, getRoadMaintenanceGeoJSON, getMaintenanceHistory, getMaintenanceWorkOrders, getWorkOrderExecution, getWorkOrderVerification, getRoadInspections } from "./api";
 
 const defaultCenter = [8.0, 39.0];
 
@@ -180,6 +180,9 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     try {
       const defects = (filtered.defectGeoJSON?.features || []).filter((item) => Number(item?.properties?.section_id) === sectionId);
       const maintenance = (filtered.maintenanceGeoJSON?.features || []).filter((item) => Number(item?.properties?.section_id) === sectionId);
+      const roadId = Number(feature?.properties?.road_id);
+      const roadInspections = roadId ? await getRoadInspections(roadId).catch(() => []) : [];
+      const inspections = (roadInspections || []).filter((item) => Number(item?.section_id) === sectionId);
       const maintenanceDetails = await Promise.all(maintenance.map(async (item) => {
         const maintenanceId = Number(item?.properties?.maintenance_id);
         if (!maintenanceId) return { item, history: [], workOrders: [] };
@@ -198,7 +201,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
         }));
         return { item, history: history || [], workOrders: enrichedOrders };
       }));
-      setSectionDetail({ feature, defects, maintenance: maintenanceDetails });
+      setSectionDetail({ feature, defects, inspections, maintenance: maintenanceDetails });
     } finally {
       setDetailLoading(false);
     }
@@ -304,6 +307,8 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
                 <div className="card"><span>Defects</span><strong>{sectionDetail.defects.length}</strong></div>
                 <div className="card"><span>Maintenance</span><strong>{sectionDetail.maintenance.length}</strong></div>
               </div>
+              <h4>Inspection history</h4>
+              {sectionDetail.inspections.length ? <ul>{sectionDetail.inspections.slice(0, 10).map((item, index) => <li key={item?.inspection_id || index}><strong>{escapeHtml(item?.inspection_date || "Inspection")}</strong> — condition {item?.condition_rating != null ? escapeHtml(item.condition_rating) : "not rated"}{item?.weather ? " · " + escapeHtml(item.weather) : ""}</li>)}</ul> : <p>No recorded inspections for this section.</p>}
               <h4>Defect history</h4>
               {sectionDetail.defects.length ? <ul>{sectionDetail.defects.slice(0, 10).map((item, index) => <li key={item?.properties?.defect_id || index}><strong>{escapeHtml(item?.properties?.defect_type || "Defect")}</strong> — {escapeHtml(item?.properties?.severity || "unclassified")}{item?.properties?.chainage_km != null ? " · Ch. " + item.properties.chainage_km : ""}</li>)}</ul> : <p>No recorded defects for this section.</p>}
               <div className="actions" style={{ marginBottom: 12 }}><button type="button" onClick={() => onNavigate?.("maintenance")}>Open Maintenance</button><button type="button" onClick={() => onNavigate?.("workorders")}>Open Work Orders</button></div>
