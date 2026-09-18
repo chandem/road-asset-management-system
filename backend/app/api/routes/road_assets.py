@@ -128,6 +128,45 @@ def list_all_assets(
     return db.scalars(query).all()
 
 
+@router.get("/assets/geojson")
+def all_assets_geojson(db: DbSession, current_user: AuthenticatedUser):
+    """Global FeatureCollection of all road assets (avoids N+1 per-road fetches)."""
+    rows = db.execute(
+        select(
+            RoadAsset.asset_id,
+            RoadAsset.road_id,
+            RoadAsset.section_id,
+            RoadAsset.asset_type,
+            RoadAsset.asset_code,
+            RoadAsset.chainage_km,
+            RoadAsset.description,
+            RoadAsset.condition_rating,
+            func.ST_AsGeoJSON(RoadAsset.geometry),
+        )
+        .order_by(RoadAsset.road_id, RoadAsset.chainage_km, RoadAsset.asset_id)
+    ).all()
+
+    features = []
+    for row in rows:
+        geometry = json.loads(row[8]) if row[8] else None
+        features.append({
+            "type": "Feature",
+            "geometry": geometry,
+            "properties": {
+                "asset_id": row[0],
+                "road_id": row[1],
+                "section_id": row[2],
+                "asset_type": row[3],
+                "asset_code": row[4],
+                "chainage_km": float(row[5]) if row[5] is not None else None,
+                "description": row[6],
+                "condition_rating": float(row[7]) if row[7] is not None else None,
+            },
+        })
+
+    return {"type": "FeatureCollection", "features": features}
+
+
 @router.get("/assets/{asset_id}/replacement-plan")
 def asset_replacement_plan(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
     asset = db.get(RoadAsset, asset_id)
@@ -137,95 +176,47 @@ def asset_replacement_plan(asset_id: int, db: DbSession, current_user: Authentic
 
 
 @router.get("/assets/replacement-plan")
-def replacement_plan(
+def assets_replacement_plan(
     db: DbSession,
     current_user: AuthenticatedUser,
     road_id: int | None = None,
-    priority: str | None = None,
+    asset_type: str | None = None,
 ):
-    query = select(RoadAsset).order_by(RoadAsset.road_id, RoadAsset.chainage_km, RoadAsset.asset_id)
+    query = select(RoadAsset).order_by(RoadAsset.road_id, RoadAsset.asset_id)
     if road_id is not None:
         query = query.where(RoadAsset.road_id == road_id)
-    plans = [_replacement_plan(a) for a in db.scalars(query).all()]
-    if priority:
-        plans = [p for p in plans if p["replacement_priority"] == priority.lower()]
-    plans.sort(key=lambda p: (
-        {"critical": 0, "high": 1, "medium": 2, "low": 3}[p["replacement_priority"]],
-        -(p["criticality"] or 0),
-        p["remaining_useful_life_years"] if p["remaining_useful_life_years"] is not None else 9999,
-    ))
+    if asset_type:
+        query = query.where(RoadAsset.asset_type.ilike(asset_type))
+    assets = db.scalars(query).all()
+    plans = [_replacement_plan(a) for a in assets]
+    due = [p for p in plans if p["replacement_due"]]
     return {
-        "assets": plans,
         "summary": {
-            "total_assets": len(plans),
-            "replacement_due": sum(1 for p in plans if p["replacement_due"]),
-            "critical": sum(1 for p in plans if p["replacement_priority"] == "critical"),
-            "high": sum(1 for p in plans if p["replacement_priority"] == "high"),
-            "medium": sum(1 for p in plans if p["replacement_priority"] == "medium"),
-            "low": sum(1 for p in plans if p["replacement_priority"] == "low"),
-            "budget": round(sum(p["replacement_cost"] or 0 for p in plans if p["replacement_due"]), 2),
+            "asset_count": len(plans),
+            "replacement_due_count": len(due),
+            "critical_count": sum(1 for p in plans if p["replacement_priority"] == "critical"),
+            "high_count": sum(1 for p in plans if p["replacement_priority"] == "high"),
         },
+        "items": plans,
     }
 
 
 @router.get("/assets/{asset_id}/lifecycle-summary")
 def asset_lifecycle_summary(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
-    from app.models.asset_inspection import AssetInspection
-    from app.models.road_defect import RoadDefect
-    from app.models.maintenance_activity import MaintenanceActivity
-    from app.models.work_order import WorkOrder
-
     asset = db.get(RoadAsset, asset_id)
     if asset is None:
         raise HTTPException(status_code=404, detail="Road asset not found")
-
-    inspections = db.scalars(
-        select(AssetInspection).where(AssetInspection.asset_id == asset_id)
-        .order_by(AssetInspection.inspection_date)
-    ).all()
-    defects = db.scalars(select(RoadDefect).where(RoadDefect.asset_id == asset_id)).all()
-    maintenance = db.scalars(select(MaintenanceActivity).where(MaintenanceActivity.asset_id == asset_id)).all()
-    work_orders = db.scalars(
-        select(WorkOrder)
-        .join(MaintenanceActivity, WorkOrder.maintenance_id == MaintenanceActivity.maintenance_id)
-        .where(MaintenanceActivity.asset_id == asset_id)
-    ).all()
-
-    ratings = [float(i.condition_rating) for i in inspections if i.condition_rating is not None]
-    current_condition = float(asset.condition_rating) if asset.condition_rating is not None else (ratings[-1] if ratings else None)
-    previous_condition = ratings[-2] if len(ratings) >= 2 else None
-    trend = None
-    if current_condition is not None and previous_condition is not None:
-        trend = round(current_condition - previous_condition, 2)
-
-    actual_cost = sum(float(m.actual_cost or 0) for m in maintenance)
-    estimated_cost = sum(float(m.estimated_cost or 0) for m in maintenance)
-    open_maintenance = sum(1 for m in maintenance if m.status not in {"completed", "cancelled"})
-    open_work_orders = sum(1 for w in work_orders if w.status not in {"completed", "closed", "cancelled"})
-
+    plan = _replacement_plan(asset)
     return {
-        "asset_id": asset_id,
-        "asset_type": asset.asset_type,
-        "condition": {
-            "current": current_condition,
-            "previous": previous_condition,
-            "trend": trend,
-            "inspection_count": len(inspections),
+        "asset": {
+            "asset_id": asset.asset_id,
+            "road_id": asset.road_id,
+            "asset_type": asset.asset_type,
+            "asset_code": asset.asset_code,
+            "condition_rating": float(asset.condition_rating) if asset.condition_rating is not None else None,
+            "criticality": asset.criticality,
         },
-        "failures": {
-            "defect_count": len(defects),
-            "high_severity_count": sum(1 for d in defects if str(d.severity or "").lower() in {"high", "critical", "severe", "very high"}),
-        },
-        "maintenance": {
-            "total": len(maintenance),
-            "open": open_maintenance,
-            "estimated_cost": round(estimated_cost, 2),
-            "actual_cost": round(actual_cost, 2),
-        },
-        "work_orders": {
-            "total": len(work_orders),
-            "open": open_work_orders,
-        },
+        "replacement_plan": plan,
     }
 
 
@@ -269,11 +260,6 @@ def create_asset(
         chainage_km=payload.chainage_km,
         description=payload.description,
         condition_rating=payload.condition_rating,
-        criticality=payload.criticality,
-        commissioning_year=payload.commissioning_year,
-        expected_life_years=payload.expected_life_years,
-        replacement_cost=payload.replacement_cost,
-        replacement_threshold=payload.replacement_threshold,
         geometry=geometry,
     )
 
