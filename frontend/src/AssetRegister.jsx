@@ -9,6 +9,7 @@ import {
   getAssetDefects,
   getAssetMaintenance,
   getMaintenanceWorkOrders,
+  getAssetLifecycleSummary,
 } from "./api";
 
 const ASSET_TYPES = [
@@ -37,6 +38,7 @@ export default function AssetRegister() {
   const [assetDefects, setAssetDefects] = useState([]);
   const [assetMaintenance, setAssetMaintenance] = useState([]);
   const [assetWorkOrders, setAssetWorkOrders] = useState([]);
+  const [assetSummary, setAssetSummary] = useState(null);
   const [inspectionForm, setInspectionForm] = useState({ inspection_date: new Date().toISOString().slice(0, 10), condition_rating: "", defect_status: "", notes: "" });
   const [form, setForm] = useState({
     road_id: "",
@@ -105,6 +107,7 @@ export default function AssetRegister() {
         getAssetInspections(asset.asset_id),
         getAssetDefects(asset.asset_id),
         getAssetMaintenance(asset.asset_id),
+        getAssetLifecycleSummary(asset.asset_id),
       ]);
       const workOrderGroups = await Promise.all(
         maintenance.map(m => getMaintenanceWorkOrders(m.maintenance_id).catch(() => []))
@@ -113,6 +116,7 @@ export default function AssetRegister() {
       setAssetDefects(defects);
       setAssetMaintenance(maintenance);
       setAssetWorkOrders(workOrderGroups.flat());
+      setAssetSummary(arguments[0][3]);
     } catch (err) {
       setMessage(err.message || String(err));
     }
@@ -355,6 +359,7 @@ export default function AssetRegister() {
             <div><h3>Asset lifecycle — {selectedAsset.asset_code || `Asset #${selectedAsset.asset_id}`}</h3><p>Asset → inspection → defect → maintenance → work order lifecycle.</p></div>
             <button type="button" onClick={() => setSelectedAsset(null)}>Close</button>
           </div>
+          {assetSummary && <div className="stats-grid" style={{margin:"12px 0"}}><div><strong>{assetSummary.condition.current ?? "—"}</strong><span>Current condition</span></div><div><strong>{assetSummary.condition.trend ?? "—"}</strong><span>Condition change</span></div><div><strong>{assetSummary.failures.defect_count}</strong><span>Defects / failures</span></div><div><strong>{assetSummary.maintenance.actual_cost.toLocaleString()}</strong><span>Maintenance cost</span></div><div><strong>{assetSummary.work_orders.open}</strong><span>Open work orders</span></div></div>}
           <form onSubmit={saveAssetInspection} className="form-grid">
             <label>Date<input type="date" value={inspectionForm.inspection_date} onChange={e => setInspectionForm(f => ({...f, inspection_date:e.target.value}))} required /></label>
             <label>Condition (0–100)<input type="number" min="0" max="100" step="0.1" value={inspectionForm.condition_rating} onChange={e => setInspectionForm(f => ({...f, condition_rating:e.target.value}))} /></label>
