@@ -14,6 +14,23 @@ function money(value) {
   return Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+async function downloadBlob(path, filename) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Download failed: ${filename}`);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Reports() {
   const [roads, setRoads] = useState([]);
   const [plans, setPlans] = useState([]);
@@ -32,12 +49,17 @@ export default function Reports() {
       .catch((err) => setError(err.message));
   }, []);
 
-  async function loadReports() {
-    setLoading(true); setError("");
+  function queryString() {
     const params = new URLSearchParams();
     if (roadId) params.set("road_id", roadId);
     if (year) params.set("plan_year", year);
-    const query = params.toString() ? `?${params}` : "";
+    const qs = params.toString();
+    return qs ? `?${qs}` : "";
+  }
+
+  async function loadReports() {
+    setLoading(true); setError("");
+    const query = queryString();
     try {
       const [maintenanceData, conditionData, defectData, costData] = await Promise.all([
         fetchReport(`/reports/maintenance${query}`),
@@ -51,41 +73,21 @@ export default function Reports() {
   }
 
   async function exportMaintenanceCsv() {
-    const params = new URLSearchParams();
-    if (roadId) params.set("road_id", roadId);
-    if (year) params.set("plan_year", year);
-    const response = await fetch(`${API_BASE}/reports/maintenance.csv?${params}`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
-    if (!response.ok) { setError(await response.text()); return; }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a"); link.href = url; link.download = "maintenance-report.csv"; link.click();
-    URL.revokeObjectURL(url);
+    try {
+      await downloadBlob(`/reports/maintenance.csv${queryString()}`, "maintenance-report.csv");
+    } catch (err) { setError(err.message); }
   }
 
   async function exportExcel() {
     try {
-      const params = new URLSearchParams();
-      if (roadId) params.set("road_id", roadId);
-      if (year) params.set("plan_year", year);
-      const response = await fetch(`${API_BASE}/reports/export.xlsx?${params}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || "Excel export failed");
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "rams-reports.xlsx";
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err.message || "Excel export failed");
-    }
+      await downloadBlob(`/reports/export.xlsx${queryString()}`, "rams-reports.xlsx");
+    } catch (err) { setError(err.message || "Excel export failed"); }
+  }
+
+  async function exportPdf() {
+    try {
+      await downloadBlob(`/reports/export.pdf${queryString()}`, "rams-reports.pdf");
+    } catch (err) { setError(err.message || "PDF export failed"); }
   }
 
   return (
@@ -119,12 +121,9 @@ export default function Reports() {
         <button type="button" onClick={loadReports} disabled={loading}>
           {loading ? "Loading…" : "Generate reports"}
         </button>
-        <button type="button" onClick={exportMaintenanceCsv}>
-          Export maintenance CSV
-        </button>
-        <button type="button" onClick={exportExcel}>
-          Export Excel
-        </button>
+        <button type="button" onClick={exportMaintenanceCsv}>Export maintenance CSV</button>
+        <button type="button" onClick={exportExcel}>Export Excel</button>
+        <button type="button" onClick={exportPdf}>Export PDF</button>
       </div>
       {error && <div className="auth-error">{error}</div>}
 
@@ -137,43 +136,14 @@ export default function Reports() {
             <div><strong>{money(maintenance.summary.estimated_cost)}</strong><span>Estimated cost</span></div>
             <div><strong>{money(maintenance.summary.actual_cost)}</strong><span>Actual cost</span></div>
           </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Road</th><th>Activity</th><th>Priority</th><th>Planned</th>
-                  <th>Status</th><th>Estimated</th><th>Actual</th>
-                </tr>
-              </thead>
-              <tbody>
-                {maintenance.items.map((item) => (
-                  <tr key={item.maintenance_id}>
-                    <td>{item.road_code}</td>
-                    <td>{item.activity_type}</td>
-                    <td>{item.priority || "—"}</td>
-                    <td>{item.planned_date || "—"}</td>
-                    <td>{item.status}</td>
-                    <td>{money(item.estimated_cost)}</td>
-                    <td>{money(item.actual_cost)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
-
       {condition && (
         <div className="report-block">
           <h3>Road condition report</h3>
           <div className="table-wrap">
             <table>
-              <thead>
-                <tr>
-                  <th>Road</th><th>Sections</th><th>Average condition</th>
-                  <th>Minimum</th><th>Maximum</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Road</th><th>Sections</th><th>Average condition</th><th>Minimum</th><th>Maximum</th></tr></thead>
               <tbody>
                 {condition.items.map((item) => (
                   <tr key={item.road_id}>
@@ -189,35 +159,12 @@ export default function Reports() {
           </div>
         </div>
       )}
-
       {defects && (
         <div className="report-block">
           <h3>Defect report</h3>
           <p>Total defects: <strong>{defects.summary.defect_count}</strong></p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Road</th><th>Type</th><th>Severity</th>
-                  <th>Chainage km</th><th>Detected by</th>
-                </tr>
-              </thead>
-              <tbody>
-                {defects.items.map((item) => (
-                  <tr key={item.defect_id}>
-                    <td>{item.road_code || "—"}</td>
-                    <td>{item.defect_type}</td>
-                    <td>{item.severity || "—"}</td>
-                    <td>{item.chainage_km ?? "—"}</td>
-                    <td>{item.detected_by}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
-
       {costs && (
         <div className="report-block">
           <h3>Cost & budget report</h3>
@@ -225,14 +172,7 @@ export default function Reports() {
             <div><strong>{money(costs.summary.budget)}</strong><span>Budget</span></div>
             <div><strong>{money(costs.summary.estimated_cost)}</strong><span>Estimated</span></div>
             <div><strong>{money(costs.summary.actual_cost)}</strong><span>Actual</span></div>
-            <div>
-              <strong>
-                {costs.summary.budget_utilization_percent == null
-                  ? "—"
-                  : `${costs.summary.budget_utilization_percent.toFixed(1)}%`}
-              </strong>
-              <span>Budget used</span>
-            </div>
+            <div><strong>{costs.summary.budget_utilization_percent == null ? "—" : `${costs.summary.budget_utilization_percent.toFixed(1)}%`}</strong><span>Budget used</span></div>
           </div>
         </div>
       )}
