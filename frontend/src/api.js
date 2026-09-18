@@ -36,6 +36,7 @@ async function request(path, options = {}) {
 export function getRoads() { return request("/roads"); }
 export function getDashboardSummary() { return request("/dashboard/summary"); }
 export function getDashboardAttention() { return request("/dashboard/attention"); }
+export function getDashboardKPIs() { return request("/dashboard/kpis"); }
 export function getRoadGeoJSON() { return request("/roads/geojson"); }
 export function getGPSTrackGeoJSON() { return request("/gps-tracks/geojson"); }
 export function getGPSMatch(latitude, longitude, maxDistanceM = 100) {
