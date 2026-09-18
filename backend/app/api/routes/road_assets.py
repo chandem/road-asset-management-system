@@ -13,6 +13,50 @@ from app.models.road_section import RoadSection
 from app.schemas.road_asset import RoadAssetCreate, RoadAssetResponse
 
 router = APIRouter(tags=["Road Assets"])
+
+
+def _replacement_plan(asset: RoadAsset, year: int = 2026) -> dict:
+    condition = float(asset.condition_rating) if asset.condition_rating is not None else None
+    age = None
+    remaining_life = None
+    if asset.commissioning_year is not None:
+        age = max(0, year - int(asset.commissioning_year))
+        if asset.expected_life_years is not None:
+            remaining_life = int(asset.expected_life_years) - age
+
+    due_by_age = remaining_life is not None and remaining_life <= 0
+    due_by_condition = condition is not None and condition <= float(asset.replacement_threshold)
+    if due_by_age or due_by_condition:
+        priority = "critical"
+    elif (remaining_life is not None and remaining_life <= 2) or (
+        condition is not None and condition <= float(asset.replacement_threshold) + 10
+    ):
+        priority = "high"
+    elif (remaining_life is not None and remaining_life <= 5) or (
+        condition is not None and condition <= float(asset.replacement_threshold) + 20
+    ):
+        priority = "medium"
+    else:
+        priority = "low"
+
+    return {
+        "asset_id": asset.asset_id,
+        "road_id": asset.road_id,
+        "section_id": asset.section_id,
+        "asset_type": asset.asset_type,
+        "asset_code": asset.asset_code,
+        "condition": condition,
+        "criticality": asset.criticality,
+        "commissioning_year": asset.commissioning_year,
+        "age_years": age,
+        "expected_life_years": asset.expected_life_years,
+        "remaining_useful_life_years": remaining_life,
+        "replacement_cost": float(asset.replacement_cost) if asset.replacement_cost is not None else None,
+        "replacement_threshold": float(asset.replacement_threshold),
+        "replacement_priority": priority,
+        "replacement_due": due_by_age or due_by_condition,
+    }
+
 DbSession = Annotated[Session, Depends(get_db)]
 
 
