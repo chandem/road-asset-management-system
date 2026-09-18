@@ -8,6 +8,7 @@ MaintenanceStatus = Literal["planned", "in progress", "completed", "cancelled"]
 
 
 class MaintenanceActivityCreate(BaseModel):
+    asset_id: Optional[int] = None
     section_id: Optional[int] = None
     source_defect_id: Optional[int] = None
     activity_type: str = Field(min_length=1, max_length=100)
@@ -41,6 +42,7 @@ class MaintenanceActivityResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     maintenance_id: int
+    asset_id: Optional[int] = None
     road_id: Optional[int] = None
     section_id: Optional[int] = None
     source_defect_id: Optional[int] = None
