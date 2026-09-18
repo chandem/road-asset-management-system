@@ -45,6 +45,8 @@ export function getGPSMatch(latitude, longitude, maxDistanceM = 100) {
 }
 export function getRoadSectionGeoJSON(roadId) { return request(`/roads/${roadId}/sections/geojson`); }
 export function getRoadAssetGeoJSON(roadId) { return request(`/roads/${roadId}/assets/geojson`); }
+export function getSectionsGeoJSON() { return request("/sections/geojson"); }
+export function getAssetsGeoJSON() { return request("/assets/geojson"); }
 export function listAssets(params = {}) {
   const q = new URLSearchParams();
   if (params.road_id) q.set("road_id", params.road_id);
