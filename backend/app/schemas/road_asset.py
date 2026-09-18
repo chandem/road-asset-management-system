@@ -18,6 +18,21 @@ class RoadAssetCreate(BaseModel):
     geometry_wkt: Optional[str] = None
 
 
+class RoadAssetUpdate(BaseModel):
+    asset_type: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    asset_code: Optional[str] = Field(default=None, max_length=80)
+    section_id: Optional[int] = None
+    chainage_km: Optional[float] = Field(default=None, ge=0)
+    description: Optional[str] = None
+    condition_rating: Optional[float] = Field(default=None, ge=0, le=100)
+    criticality: Optional[int] = Field(default=None, ge=1, le=5)
+    commissioning_year: Optional[int] = Field(default=None, ge=1900, le=2100)
+    expected_life_years: Optional[int] = Field(default=None, ge=1, le=200)
+    replacement_cost: Optional[float] = Field(default=None, ge=0)
+    replacement_threshold: Optional[float] = Field(default=None, ge=0, le=100)
+    geometry_wkt: Optional[str] = None
+
+
 class RoadAssetResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
