@@ -4,7 +4,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-WorkOrderStatus = Literal["draft", "issued", "in progress", "completed", "cancelled"]
+WorkOrderStatus = Literal["draft", "issued", "in progress", "completed", "closed", "cancelled"]
 
 
 class WorkOrderCreate(BaseModel):
