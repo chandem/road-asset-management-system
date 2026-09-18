@@ -62,10 +62,25 @@ function conditionPriority(score, critical, high) {
   return "low";
 }
 
-function conditionColor(score) {\n  if (!Number.isFinite(score)) return "#64748b";\n  if (score >= 85) return "#16a34a";\n  if (score >= 70) return "#65a30d";\n  if (score >= 50) return "#eab308";\n  if (score >= 30) return "#f97316";\n  return "#dc2626";\n}\n\nfunction severityColor(severity) {\n  const value = String(severity || "").toLowerCase();\n  return { critical: "#991b1b", high: "#dc2626", medium: "#f59e0b", low: "#16a34a" }[value] || "#64748b";\n}\n\nfunction sectionStyle(feature) {
+function conditionColor(score) {
+  if (!Number.isFinite(score)) return "#64748b";
+  if (score >= 85) return "#16a34a";
+  if (score >= 70) return "#65a30d";
+  if (score >= 50) return "#eab308";
+  if (score >= 30) return "#f97316";
+  return "#dc2626";
+}
+
+function severityColor(severity) {
+  const value = String(severity || "").toLowerCase();
+  return { critical: "#991b1b", high: "#dc2626", medium: "#f59e0b", low: "#16a34a" }[value] || "#64748b";
+}
+
+function sectionStyle(feature) {
   const score = Number(feature?.properties?.condition_rating);
   const weight = Number.isFinite(score) ? (score < 30 ? 7 : score < 50 ? 6 : score < 70 ? 5 : 4) : 4;
-  const color = conditionColor(score);\n  return { color, weight, fillColor: color, fillOpacity: 0.18, dashArray: "4 4", opacity: 0.95 };
+  const color = conditionColor(score);
+  return { color, weight, fillColor: color, fillOpacity: 0.18, dashArray: "4 4", opacity: 0.95 };
 }
 
 function pointStyle(radius) {
@@ -83,7 +98,8 @@ function pointStyle(radius) {
 function maintenanceStyle(feature, latlng) {
   const priority = String(feature?.properties?.priority || "").toLowerCase();
   const radius = { critical: 10, high: 8, medium: 7, low: 6 }[priority] || 6;
-  const color = { critical: "#991b1b", high: "#dc2626", medium: "#f59e0b", low: "#16a34a" }[priority] || "#64748b";\n  return L.circleMarker(latlng, { radius, color, fillColor: color, weight: 2, fillOpacity: 0.78 });
+  const color = { critical: "#991b1b", high: "#dc2626", medium: "#f59e0b", low: "#16a34a" }[priority] || "#64748b";
+  return L.circleMarker(latlng, { radius, color, fillColor: color, weight: 2, fillOpacity: 0.78 });
 }
 
 function chainageStyle(feature, latlng) {
