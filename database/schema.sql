@@ -158,6 +158,7 @@ CREATE TABLE maintenance_plans (
 
 CREATE TABLE maintenance_activities (
     maintenance_id BIGSERIAL PRIMARY KEY,
+    asset_id BIGINT REFERENCES road_assets(asset_id) ON DELETE SET NULL,
     road_id BIGINT REFERENCES roads(road_id) ON DELETE SET NULL,
     section_id BIGINT REFERENCES road_sections(section_id) ON DELETE SET NULL,
     source_defect_id BIGINT REFERENCES road_defects(defect_id) ON DELETE SET NULL,
@@ -175,6 +176,17 @@ CREATE TABLE maintenance_activities (
     CHECK (chainage_km IS NULL OR chainage_km >= 0),
     CHECK (estimated_cost IS NULL OR estimated_cost >= 0),
     CHECK (actual_cost IS NULL OR actual_cost >= 0)
+);
+
+CREATE TABLE asset_inspections (
+    asset_inspection_id BIGSERIAL PRIMARY KEY,
+    asset_id BIGINT NOT NULL REFERENCES road_assets(asset_id) ON DELETE CASCADE,
+    inspection_date DATE NOT NULL,
+    inspector_id BIGINT REFERENCES users(user_id) ON DELETE SET NULL,
+    condition_rating NUMERIC(5,2),
+    defect_status VARCHAR(50),
+    notes TEXT,
+    CHECK (condition_rating IS NULL OR (condition_rating >= 0 AND condition_rating <= 100))
 );
 
 CREATE TABLE maintenance_history (
@@ -229,6 +241,8 @@ CREATE INDEX idx_chainage_geometry ON chainage_points USING GIST (geometry);
 CREATE INDEX idx_assets_geometry ON road_assets USING GIST (geometry);
 CREATE INDEX idx_defects_geometry ON road_defects USING GIST (geometry);
 CREATE INDEX idx_gps_tracks_geometry ON gps_tracks USING GIST (geometry);
+CREATE INDEX idx_asset_inspections_asset_date ON asset_inspections (asset_id, inspection_date);
+CREATE INDEX idx_maintenance_asset ON maintenance_activities (asset_id);
 CREATE INDEX idx_maintenance_source_defect ON maintenance_activities (source_defect_id);
 CREATE INDEX idx_maintenance_section_chainage ON maintenance_activities (section_id, chainage_km);
 CREATE INDEX idx_maintenance_history_maintenance ON maintenance_history (maintenance_id, changed_at DESC);
