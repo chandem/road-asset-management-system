@@ -13,7 +13,15 @@ import {
   createWorkOrderVerification,
 } from "./api";
 
-const STATUSES = ["draft", "issued", "in progress", "completed", "cancelled"];
+const STATUSES = ["draft", "issued", "in progress", "completed", "closed", "cancelled"];
+const TRANSITIONS = {
+  draft: ["issued", "cancelled"],
+  issued: ["in progress", "cancelled"],
+  "in progress": ["completed", "cancelled"],
+  completed: ["closed", "in progress"],
+  closed: [],
+  cancelled: [],
+};
 function today() { return new Date().toISOString().slice(0, 10); }
 
 export default function WorkOrderManagement() {
@@ -48,7 +56,19 @@ export default function WorkOrderManagement() {
     catch (error) { setMessage(`Create work order error: ${error.message}`); }
   }
   async function loadHistory(id) { try { setHistory(await getWorkOrderHistory(id)); } catch (error) { setMessage(`History error: ${error.message}`); } }
-  async function changeStatus(order, status) { try { await updateWorkOrder(order.work_order_id, { status }); setMessage(`Work order ${order.order_number} is now ${status}.`); await load(); if (selectedId === order.work_order_id) await loadHistory(order.work_order_id); } catch (error) { setMessage(`Status update error: ${error.message}`); } }
+  async function changeStatus(order, status) {
+    if (status === order.status) return;
+    if (!TRANSITIONS[order.status]?.includes(status)) {
+      setMessage(`Invalid lifecycle transition: ${order.status} → ${status}`);
+      return;
+    }
+    try {
+      await updateWorkOrder(order.work_order_id, { status });
+      setMessage(`Work order ${order.order_number} is now ${status}.`);
+      await load();
+      if (selectedId === order.work_order_id) await loadHistory(order.work_order_id);
+    } catch (error) { setMessage(`Status update error: ${error.message}`); }
+  }
   async function assign(order) {
     const assignedTo = window.prompt("Assign to contractor/person", order.assigned_to || ""); if (assignedTo === null) return;
     try { await updateWorkOrder(order.work_order_id, { assigned_to: assignedTo.trim() || null }); setMessage("Assignment updated."); await load(); if (selectedId === order.work_order_id) await loadHistory(order.work_order_id); } catch (error) { setMessage(`Assignment error: ${error.message}`); }
@@ -63,7 +83,7 @@ export default function WorkOrderManagement() {
       <label>Order number<input value={form.order_number} onChange={(e) => setForm({ ...form, order_number: e.target.value })} required /></label><label>Issue date<input type="date" value={form.issue_date} onChange={(e) => setForm({ ...form, issue_date: e.target.value })} required /></label><label>Due date<input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label><label>Assign to<input value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} placeholder="Contractor or responsible person" /></label><label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></label><label className="full-width">Instructions<textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} rows="3" /></label><button type="submit">Create</button><button type="button" onClick={() => setShowForm(false)}>Cancel</button>
     </form>}
     {loading ? <p>Loading work orders…</p> : <div className="table-wrap"><table><thead><tr><th>Order</th><th>Maintenance</th><th>Road</th><th>Priority</th><th>Issue</th><th>Due</th><th>Assigned</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-      {filteredOrders.map((order) => { const a = maintenanceById.get(Number(order.maintenance_id)); const road = roadById.get(Number(a?.road_id)); return <tr key={order.work_order_id}><td><button type="button" onClick={() => toggleDetails(order.work_order_id)}>{order.order_number}</button></td><td>{a?.activity_type || order.maintenance_id}</td><td>{road?.road_name || a?.road_id || "—"}</td><td>{a?.priority || "—"}</td><td>{order.issue_date}</td><td>{order.due_date || "—"}</td><td>{order.assigned_to || "—"}</td><td><select value={order.status} onChange={(e) => changeStatus(order, e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></td><td><button type="button" onClick={() => assign(order)}>Assign</button></td></tr>; })}
+      {filteredOrders.map((order) => { const a = maintenanceById.get(Number(order.maintenance_id)); const road = roadById.get(Number(a?.road_id)); return <tr key={order.work_order_id}><td><button type="button" onClick={() => toggleDetails(order.work_order_id)}>{order.order_number}</button></td><td>{a?.activity_type || order.maintenance_id}</td><td>{road?.road_name || a?.road_id || "—"}</td><td>{a?.priority || "—"}</td><td>{order.issue_date}</td><td>{order.due_date || "—"}</td><td>{order.assigned_to || "—"}</td><td><select value={order.status} onChange={(e) => changeStatus(order, e.target.value)} disabled={!TRANSITIONS[order.status]?.length}><option value={order.status}>{order.status}</option>{(TRANSITIONS[order.status] || []).map((s) => <option key={s} value={s}>{s}</option>)}</select></td><td><button type="button" onClick={() => assign(order)}>Assign</button></td></tr>; })}
       {!filteredOrders.length && <tr><td colSpan="9">No work orders match the selected filters.</td></tr>}
     </tbody></table></div>}
     {selectedId && <div className="action-panel"><h3>Field Execution — #{selectedId}</h3>
@@ -74,8 +94,16 @@ export default function WorkOrderManagement() {
         for (const key of ["planned_quantity","actual_quantity","actual_cost","gps_latitude","gps_longitude"]) payload[key] = payload[key] === "" ? null : Number(payload[key]);
         for (const key of ["started_at","completed_at"]) if (payload[key] === "") payload[key] = null;
         try {
+          const currentOrder = workOrders.find((order) => order.work_order_id === selectedId);
+          if (currentOrder?.status === "issued") {
+            await updateWorkOrder(selectedId, { status: "in progress" });
+          }
           const saved = execution ? await updateWorkOrderExecution(selectedId, payload) : await createWorkOrderExecution(selectedId, payload);
-          setExecution(saved); setMessage("Field execution saved.");
+          setExecution(saved);
+          if (payload.completed_at) await updateWorkOrder(selectedId, { status: "completed" });
+          await load();
+          setMessage(payload.completed_at ? "Field execution saved and work order marked completed." : "Field execution saved.");
+          await loadHistory(selectedId);
         } catch (error) { setMessage(`Execution save error: ${error.message}`); }
       }}>
         <label>Started at<input name="started_at" type="datetime-local" defaultValue={execution?.started_at ? execution.started_at.slice(0,16) : ""} /></label>
@@ -100,8 +128,13 @@ export default function WorkOrderManagement() {
         payload.completed_quantity = payload.completed_quantity === "" ? null : Number(payload.completed_quantity);
         payload.gps_latitude = payload.gps_latitude === "" ? null : Number(payload.gps_latitude);
         payload.gps_longitude = payload.gps_longitude === "" ? null : Number(payload.gps_longitude);
-        try { const saved = await createWorkOrderVerification(selectedId, payload); setVerification(saved); setMessage("Completion verified."); }
-        catch (error) { setMessage(`Verification error: ${error.message}`); }
+        try {
+          const saved = await createWorkOrderVerification(selectedId, payload);
+          setVerification(saved);
+          await load();
+          await loadHistory(selectedId);
+          setMessage(payload.result === "rejected" ? "Verification rejected; work order returned to in progress." : "Completion verified; work order closed.");
+        } catch (error) { setMessage(`Verification error: ${error.message}`); }
       }}>
         <label>Verified by<input name="verified_by" required defaultValue={verification?.verified_by || ""} /></label>
         <label>Result<select name="result" defaultValue={verification?.result || "accepted"}><option>accepted</option><option>accepted with observations</option><option>rejected</option></select></label>
