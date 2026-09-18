@@ -266,6 +266,11 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     </table>${activityRows ? `<strong>Recent maintenance</strong><ul>${activityRows}</ul>` : ""}<small>Based on recorded condition, defects and maintenance records.</small></div>`);
   }, [filtered.defectGeoJSON, filtered.maintenanceGeoJSON]);
 
+  const sectionHandlers = useMemo(() => (feature, layer) => {
+    sectionPopupHandlers(feature, layer);
+    layer.on("click", () => onSectionSelect?.(feature));
+  }, [sectionPopupHandlers, onSectionSelect]);
+
   return (
     <section className="map-panel">
       <div className="panel-heading">
@@ -293,7 +298,7 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
         <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         {visible.roads && filtered.roadGeoJSON && <GeoJSON data={filtered.roadGeoJSON} style={featureStyle(5)} onEachFeature={popupHandlers()} />}
         {visible.gps && filtered.gpsGeoJSON && <GeoJSON data={filtered.gpsGeoJSON} style={featureStyle(3, "8 6")} onEachFeature={popupHandlers()} />}
-        {visible.sections && filtered.sectionGeoJSON && <GeoJSON data={filtered.sectionGeoJSON} style={sectionStyle} onEachFeature={sectionPopupHandlers} />}
+        {visible.sections && filtered.sectionGeoJSON && <GeoJSON data={filtered.sectionGeoJSON} style={sectionStyle} onEachFeature={sectionHandlers} />}
         {visible.assets && filtered.assetGeoJSON && <GeoJSON data={filtered.assetGeoJSON} pointToLayer={pointStyle(7)} onEachFeature={popupHandlers()} />}
         {visible.defects && filtered.defectGeoJSON && <GeoJSON data={filtered.defectGeoJSON} pointToLayer={pointStyle(8)} onEachFeature={popupHandlers()} />}
         {(visible.chainage ?? true) && filtered.chainageGeoJSON && <GeoJSON data={filtered.chainageGeoJSON} pointToLayer={chainageStyle} onEachFeature={popupHandlers()} />}
