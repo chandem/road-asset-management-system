@@ -100,7 +100,22 @@ export default function AssetRegister() {
 
   async function openAsset(asset) {
     setSelectedAsset(asset);
-    try { setAssetInspections(await getAssetInspections(asset.asset_id)); } catch (err) { setMessage(err.message || String(err)); }
+    try {
+      const [inspections, defects, maintenance] = await Promise.all([
+        getAssetInspections(asset.asset_id),
+        getAssetDefects(asset.asset_id),
+        getAssetMaintenance(asset.asset_id),
+      ]);
+      const workOrderGroups = await Promise.all(
+        maintenance.map(m => getMaintenanceWorkOrders(m.maintenance_id).catch(() => []))
+      );
+      setAssetInspections(inspections);
+      setAssetDefects(defects);
+      setAssetMaintenance(maintenance);
+      setAssetWorkOrders(workOrderGroups.flat());
+    } catch (err) {
+      setMessage(err.message || String(err));
+    }
   }
 
   async function saveAssetInspection(e) {
@@ -108,7 +123,7 @@ export default function AssetRegister() {
     if (!selectedAsset) return;
     try {
       await createAssetInspection(selectedAsset.asset_id, { ...inspectionForm, condition_rating: inspectionForm.condition_rating === "" ? null : Number(inspectionForm.condition_rating) });
-      setAssetInspections(await getAssetInspections(selectedAsset.asset_id));
+      await openAsset(selectedAsset);
       setMessage("Asset inspection saved.");
       await load();
     } catch (err) { setMessage(err.message || String(err)); }
