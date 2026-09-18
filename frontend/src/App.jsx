@@ -349,14 +349,14 @@ function App({ user }) {
         {activeTab === "overview" && (
           <>
             <SummaryCards loading={loading} counts={summaryCounts} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} />
-    {activeTab === "overview" && kpis && (
-      <section className="cards" aria-label="RAMS performance KPIs">
-        <div className="card"><span>Maintenance completion</span><strong>{kpis.maintenance?.completion_rate_percent ?? "—"}%</strong></div>
-        <div className="card"><span>Overdue maintenance</span><strong>{kpis.maintenance?.overdue ?? 0}</strong></div>
-        <div className="card"><span>Cost variance</span><strong>{kpis.cost?.variance_percent ?? "—"}%</strong></div>
-        <div className="card"><span>Verified work orders</span><strong>{kpis.work_orders?.verified ?? 0}</strong></div>
-      </section>
-    )}
+            {kpis && (
+              <section className="cards" aria-label="RAMS performance KPIs">
+                <div className="card"><span>Maintenance completion</span><strong>{kpis.maintenance?.completion_rate_percent ?? "—"}%</strong></div>
+                <div className="card"><span>Overdue maintenance</span><strong>{kpis.maintenance?.overdue ?? 0}</strong></div>
+                <div className="card"><span>Cost variance</span><strong>{kpis.cost?.variance_percent ?? "—"}%</strong></div>
+                <div className="card"><span>Verified work orders</span><strong>{kpis.work_orders?.verified ?? 0}</strong></div>
+              </section>
+            )}
             <AttentionPanel attention={attention} loading={loading} onNavigate={setActiveTab} />
             <ReportPanel report={report} onRefresh={loadDashboard} />
             <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
