@@ -10,6 +10,8 @@ from app.db.session import get_db
 from app.models.maintenance_activity import MaintenanceActivity
 from app.models.work_order import WorkOrder
 from app.models.work_order_history import WorkOrderHistory
+from app.models.work_order_execution import WorkOrderExecution
+from app.schemas.work_order_execution import WorkOrderExecutionCreate, WorkOrderExecutionResponse, WorkOrderExecutionUpdate
 from app.schemas.work_order import WorkOrderCreate, WorkOrderResponse, WorkOrderUpdate
 
 router = APIRouter(tags=["Work Orders"])
@@ -148,3 +150,52 @@ def update_work_order(
         raise HTTPException(status_code=400, detail="Could not update work order")
     db.refresh(order)
     return order
+
+
+@router.get("/work-orders/{work_order_id}/execution", response_model=WorkOrderExecutionResponse | None)
+def get_execution(work_order_id: int, db: DbSession, current_user: AuthenticatedUser):
+    if db.get(WorkOrder, work_order_id) is None:
+        raise HTTPException(status_code=404, detail="Work order not found")
+    return db.scalar(select(WorkOrderExecution).where(WorkOrderExecution.work_order_id == work_order_id))
+
+
+@router.post("/work-orders/{work_order_id}/execution", response_model=WorkOrderExecutionResponse, status_code=201)
+def create_execution(work_order_id: int, payload: WorkOrderExecutionCreate, db: DbSession, current_user: EngineerUser):
+    order = db.get(WorkOrder, work_order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Work order not found")
+    if db.scalar(select(WorkOrderExecution).where(WorkOrderExecution.work_order_id == work_order_id)):
+        raise HTTPException(status_code=409, detail="Work order execution already exists")
+    execution = WorkOrderExecution(
+        work_order_id=work_order_id,
+        **payload.model_dump(),
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(execution)
+    try:
+        db.commit()
+        db.refresh(execution)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not create work order execution")
+    return execution
+
+
+@router.patch("/work-orders/{work_order_id}/execution", response_model=WorkOrderExecutionResponse)
+def update_execution(work_order_id: int, payload: WorkOrderExecutionUpdate, db: DbSession, current_user: EngineerUser):
+    execution = db.scalar(select(WorkOrderExecution).where(WorkOrderExecution.work_order_id == work_order_id))
+    if execution is None:
+        raise HTTPException(status_code=404, detail="Work order execution not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(execution, field, value)
+    if execution.started_at and execution.completed_at and execution.completed_at < execution.started_at:
+        raise HTTPException(status_code=400, detail="completed_at cannot be before started_at")
+    execution.updated_at = datetime.now(timezone.utc)
+    try:
+        db.commit()
+        db.refresh(execution)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Could not update work order execution")
+    return execution
