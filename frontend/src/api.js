@@ -58,6 +58,7 @@ export function getAssetInspections(assetId) { return request(`/assets/${assetId
 export function createAssetInspection(assetId, payload) { return request(`/assets/${assetId}/inspections`, { method: "POST", body: JSON.stringify(payload) }); }
 export function getAssetDefects(assetId) { return request(`/assets/${assetId}/defects`); }
 export function getAssetMaintenance(assetId) { return request(`/assets/${assetId}/maintenance`); }
+export function getAssetLifecycleSummary(assetId) { return request(`/assets/${assetId}/lifecycle-summary`); }
 export function getMaintenanceWorkOrders(maintenanceId) { return request(`/maintenance/${maintenanceId}/work-orders`); }
 export function createRoadAsset(roadId, payload) {
   return request(`/roads/${roadId}/assets`, { method: "POST", body: JSON.stringify(payload) });
@@ -96,7 +97,6 @@ export function assignMaintenanceToPlan(planId, maintenanceId) { return request(
 export function unassignMaintenanceFromPlan(planId, maintenanceId) { return request(`/maintenance-plans/${planId}/activities/${maintenanceId}`, { method: "DELETE" }); }
 
 export function getWorkOrders() { return request("/work-orders"); }
-export function getMaintenanceWorkOrders(maintenanceId) { return request(`/maintenance/${maintenanceId}/work-orders`); }
 export function getWorkOrder(workOrderId) { return request(`/work-orders/${workOrderId}`); }
 export function getWorkOrderHistory(workOrderId) { return request(`/work-orders/${workOrderId}/history`); }
 export function createWorkOrder(payload) { return request("/work-orders", { method: "POST", body: JSON.stringify(payload) }); }
