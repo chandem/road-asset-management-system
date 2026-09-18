@@ -6,6 +6,9 @@ import {
   getWorkOrderHistory,
   getWorkOrders,
   updateWorkOrder,
+  getWorkOrderExecution,
+  createWorkOrderExecution,
+  updateWorkOrderExecution,
 } from "./api";
 
 const STATUSES = ["draft", "issued", "in progress", "completed", "cancelled"];
@@ -13,7 +16,7 @@ function today() { return new Date().toISOString().slice(0, 10); }
 
 export default function WorkOrderManagement() {
   const [roads, setRoads] = useState([]), [maintenance, setMaintenance] = useState([]), [workOrders, setWorkOrders] = useState([]);
-  const [history, setHistory] = useState([]), [selectedId, setSelectedId] = useState(null), [statusFilter, setStatusFilter] = useState("all"), [roadFilter, setRoadFilter] = useState("all");
+  const [history, setHistory] = useState([]), [selectedId, setSelectedId] = useState(null), [execution, setExecution] = useState(null), [statusFilter, setStatusFilter] = useState("all"), [roadFilter, setRoadFilter] = useState("all");
   const [showForm, setShowForm] = useState(false), [message, setMessage] = useState(""), [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ maintenance_id: "", order_number: "", issue_date: today(), due_date: "", status: "draft", assigned_to: "", instructions: "" });
 
@@ -48,7 +51,7 @@ export default function WorkOrderManagement() {
     const assignedTo = window.prompt("Assign to contractor/person", order.assigned_to || ""); if (assignedTo === null) return;
     try { await updateWorkOrder(order.work_order_id, { assigned_to: assignedTo.trim() || null }); setMessage("Assignment updated."); await load(); if (selectedId === order.work_order_id) await loadHistory(order.work_order_id); } catch (error) { setMessage(`Assignment error: ${error.message}`); }
   }
-  async function toggleDetails(id) { if (selectedId === id) { setSelectedId(null); setHistory([]); } else { setSelectedId(id); await loadHistory(id); } }
+  async function toggleDetails(id) { if (selectedId === id) { setSelectedId(null); setHistory([]); setExecution(null); } else { setSelectedId(id); await loadHistory(id); try { setExecution(await getWorkOrderExecution(id)); } catch (error) { setMessage(`Execution error: ${error.message}`); } } }
 
   return <section className="action-panel work-order-management">
     <div className="panel-heading"><div><h2>Work Order Management</h2><p>Create, assign, issue, track, and audit maintenance work orders.</p></div><button type="button" onClick={openCreate}>Create Work Order</button></div>
@@ -61,7 +64,33 @@ export default function WorkOrderManagement() {
       {filteredOrders.map((order) => { const a = maintenanceById.get(Number(order.maintenance_id)); const road = roadById.get(Number(a?.road_id)); return <tr key={order.work_order_id}><td><button type="button" onClick={() => toggleDetails(order.work_order_id)}>{order.order_number}</button></td><td>{a?.activity_type || order.maintenance_id}</td><td>{road?.road_name || a?.road_id || "—"}</td><td>{a?.priority || "—"}</td><td>{order.issue_date}</td><td>{order.due_date || "—"}</td><td>{order.assigned_to || "—"}</td><td><select value={order.status} onChange={(e) => changeStatus(order, e.target.value)}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></td><td><button type="button" onClick={() => assign(order)}>Assign</button></td></tr>; })}
       {!filteredOrders.length && <tr><td colSpan="9">No work orders match the selected filters.</td></tr>}
     </tbody></table></div>}
-    {selectedId && <div className="action-panel"><h3>Work Order History — #{selectedId}</h3>{history.length ? <div className="table-wrap"><table><thead><tr><th>Action</th><th>User</th><th>Time</th><th>Changes</th></tr></thead><tbody>{history.map((item) => <tr key={item.history_id}><td>{item.action}</td><td>{item.changed_by ?? "—"}</td><td>{item.changed_at}</td><td><pre>{JSON.stringify(item.new_values || {}, null, 2)}</pre></td></tr>)}</tbody></table></div> : <p>No history recorded.</p>}<button type="button" onClick={() => { setSelectedId(null); setHistory([]); }}>Close</button></div>}
+    {selectedId && <div className="action-panel"><h3>Field Execution — #{selectedId}</h3>
+      <form className="form-grid" onSubmit={async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.currentTarget);
+        const payload = Object.fromEntries(formData.entries());
+        for (const key of ["planned_quantity","actual_quantity","actual_cost","gps_latitude","gps_longitude"]) payload[key] = payload[key] === "" ? null : Number(payload[key]);
+        for (const key of ["started_at","completed_at"]) if (payload[key] === "") payload[key] = null;
+        try {
+          const saved = execution ? await updateWorkOrderExecution(selectedId, payload) : await createWorkOrderExecution(selectedId, payload);
+          setExecution(saved); setMessage("Field execution saved.");
+        } catch (error) { setMessage(`Execution save error: ${error.message}`); }
+      }}>
+        <label>Started at<input name="started_at" type="datetime-local" defaultValue={execution?.started_at ? execution.started_at.slice(0,16) : ""} /></label>
+        <label>Completed at<input name="completed_at" type="datetime-local" defaultValue={execution?.completed_at ? execution.completed_at.slice(0,16) : ""} /></label>
+        <label>Crew<input name="crew" defaultValue={execution?.crew || ""} /></label>
+        <label>Equipment<input name="equipment" defaultValue={execution?.equipment || ""} /></label>
+        <label>Materials<input name="materials" defaultValue={execution?.materials || ""} /></label>
+        <label>Planned quantity<input name="planned_quantity" type="number" step="0.001" min="0" defaultValue={execution?.planned_quantity ?? ""} /></label>
+        <label>Actual quantity<input name="actual_quantity" type="number" step="0.001" min="0" defaultValue={execution?.actual_quantity ?? ""} /></label>
+        <label>Unit<input name="quantity_unit" defaultValue={execution?.quantity_unit || ""} placeholder="m2, m3, km, etc." /></label>
+        <label>Actual cost<input name="actual_cost" type="number" step="0.01" min="0" defaultValue={execution?.actual_cost ?? ""} /></label>
+        <label>GPS latitude<input name="gps_latitude" type="number" step="any" min="-90" max="90" defaultValue={execution?.gps_latitude ?? ""} /></label>
+        <label>GPS longitude<input name="gps_longitude" type="number" step="any" min="-180" max="180" defaultValue={execution?.gps_longitude ?? ""} /></label>
+        <label className="full-width">Field notes<textarea name="notes" rows="3" defaultValue={execution?.notes || ""} /></label>
+        <button type="submit">Save Execution</button>
+      </form>
+      <h3>Work Order History — #{selectedId}</h3>{history.length ? <div className="table-wrap"><table><thead><tr><th>Action</th><th>User</th><th>Time</th><th>Changes</th></tr></thead><tbody>{history.map((item) => <tr key={item.history_id}><td>{item.action}</td><td>{item.changed_by ?? "—"}</td><td>{item.changed_at}</td><td><pre>{JSON.stringify(item.new_values || {}, null, 2)}</pre></td></tr>)}</tbody></table></div> : <p>No history recorded.</p>}<button type="button" onClick={() => { setSelectedId(null); setHistory([]); }}>Close</button></div>}
     {message && <p className="form-message">{message}</p>}
   </section>;
 }
