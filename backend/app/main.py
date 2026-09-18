@@ -4,6 +4,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes.ai_detection import router as ai_detection_router
+from app.api.routes.asset_inspections import router as asset_inspections_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.chainage_points import router as chainage_points_router
 from app.api.routes.condition_assessment import router as condition_assessment_router
@@ -62,6 +63,7 @@ app.include_router(roads_router, prefix="/api/v1")
 app.include_router(road_sections_router, prefix="/api/v1")
 app.include_router(chainage_points_router, prefix="/api/v1")
 app.include_router(road_assets_router, prefix="/api/v1")
+app.include_router(asset_inspections_router, prefix="/api/v1")
 app.include_router(inspections_router, prefix="/api/v1")
 app.include_router(inspection_workflow_router, prefix="/api/v1")
 app.include_router(road_defects_router, prefix="/api/v1")
