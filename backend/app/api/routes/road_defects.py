@@ -53,7 +53,7 @@ def defects_geojson(db: DbSession, current_user: AuthenticatedUser):
                     "detected_by": detected_by,
                 },
             }
-            for defect_id, inspection_id, section_id, defect_type, severity, chainage_km, detected_by, geometry_json in rows
+            for defect_id, inspection_id, section_id, asset_id, defect_type, severity, chainage_km, detected_by, geometry_json in rows
         ],
     }
 
