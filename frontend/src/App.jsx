@@ -26,6 +26,7 @@ import MaintenanceAnalytics from "./MaintenanceAnalytics";
 import MaintenanceEffectiveness from "./MaintenanceEffectiveness";
 import MaintenanceDecisionSupport from "./MaintenanceDecisionSupport";
 import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
+import SectionDetails from "./SectionDetails";
 import { canAccessTab, filterNavGroups, normalizeRole } from "./roles";
 
 function App({ user }) {
@@ -48,6 +49,7 @@ function App({ user }) {
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
   const [maintenanceForm, setMaintenanceForm] = useState({ section_id: "", chainage_km: "", activity_type: "", priority: "medium", planned_date: "", completed_date: "", estimated_cost: "", actual_cost: "", contractor: "", status: "planned", description: "" });
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [selectedMapSection, setSelectedMapSection] = useState(null);
 
   useEffect(() => {
     const on = () => setOnline(true); const off = () => setOnline(false);
@@ -367,7 +369,10 @@ function App({ user }) {
         )}
 
         {activeTab === "map" && (
-          <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />
+          <>
+            <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={visible} loading={loading} onSectionSelect={setSelectedMapSection} />
+            <SectionDetails section={selectedMapSection} defects={(defectGeoJSON?.features || []).filter((f) => Number(f?.properties?.section_id) === Number(selectedMapSection?.properties?.section_id))} onClose={() => setSelectedMapSection(null)} />
+          </>
         )}
 
         {activeTab === "field" && (
