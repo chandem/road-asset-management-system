@@ -18,6 +18,7 @@ from app.models.road_asset import RoadAsset
 from app.models.road_defect import RoadDefect
 from app.models.road_section import RoadSection
 from app.models.work_order import WorkOrder
+from app.models.work_order_verification import WorkOrderVerification
 
 router = APIRouter(tags=["Dashboard"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -187,5 +188,57 @@ def dashboard_attention(db: DbSession, current_user: AuthenticatedUser) -> dict[
             "high_severity_defects": len(high_defects),
             "overdue_maintenance": len(overdue_maintenance),
             "over_budget_plans": len(over_budget_plans),
+        },
+    }
+
+
+@router.get("/dashboard/kpis")
+def dashboard_kpis(db: DbSession, current_user: AuthenticatedUser) -> dict[str, Any]:
+    """Portfolio KPIs combining maintenance execution, cost, schedule and verification."""
+    total_maintenance = _count(db, MaintenanceActivity)
+    completed_maintenance = int(db.scalar(
+        select(func.count()).select_from(MaintenanceActivity)
+        .where(MaintenanceActivity.status == "completed")
+    ) or 0)
+
+    estimated = float(db.scalar(
+        select(func.coalesce(func.sum(MaintenanceActivity.estimated_cost), 0))
+    ) or 0)
+    actual = float(db.scalar(
+        select(func.coalesce(func.sum(MaintenanceActivity.actual_cost), 0))
+    ) or 0)
+
+    overdue = int(db.scalar(
+        select(func.count()).select_from(MaintenanceActivity)
+        .where(MaintenanceActivity.planned_date.is_not(None))
+        .where(MaintenanceActivity.planned_date < date.today())
+        .where(MaintenanceActivity.status.in_(OPEN_MAINT_STATUSES))
+    ) or 0)
+
+    verified = int(db.scalar(
+        select(func.count()).select_from(WorkOrder)
+        .join(MaintenanceActivity, MaintenanceActivity.maintenance_id == WorkOrder.maintenance_id)
+        .join(WorkOrderVerification,
+              WorkOrderVerification.work_order_id == WorkOrder.work_order_id)
+    ) or 0)
+
+    return {
+        "as_of": date.today().isoformat(),
+        "maintenance": {
+            "total": total_maintenance,
+            "completed": completed_maintenance,
+            "completion_rate_percent": None if total_maintenance == 0 else round(completed_maintenance / total_maintenance * 100, 2),
+            "overdue": overdue,
+        },
+        "cost": {
+            "estimated": round(estimated, 2),
+            "actual": round(actual, 2),
+            "variance": round(actual - estimated, 2),
+            "variance_percent": None if estimated == 0 else round((actual - estimated) / estimated * 100, 2),
+        },
+        "work_orders": {
+            "total": _count(db, WorkOrder),
+            "completed": int(db.scalar(select(func.count()).select_from(WorkOrder).where(WorkOrder.status == "completed")) or 0),
+            "verified": verified,
         },
     }
