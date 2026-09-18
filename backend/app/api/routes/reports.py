@@ -284,3 +284,21 @@ def reports_export_xlsx(
     defects = defect_report(db, current_user, road_id)
     costs = cost_report(db, current_user, road_id, plan_year)
     return build_reports_workbook(maint, condition, defects, costs)
+
+
+@router.get("/reports/export.pdf")
+def reports_export_pdf(
+    db: DbSession,
+    current_user: AuthenticatedUser,
+    road_id: int | None = None,
+    plan_year: int | None = None,
+    status: str | None = None,
+):
+    """Printable PDF portfolio report."""
+    from app.api.routes.pdf_export import build_reports_pdf
+
+    maint = maintenance_report(db, current_user, road_id, plan_year, status)
+    condition = road_condition_report(db, current_user, road_id)
+    defects = defect_report(db, current_user, road_id)
+    costs = cost_report(db, current_user, road_id, plan_year)
+    return build_reports_pdf(maint, condition, defects, costs)
