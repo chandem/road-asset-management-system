@@ -4,6 +4,8 @@ import {
   getDashboardSummary,
   getRoads,
   listAssets,
+  getAssetInspections,
+  createAssetInspection,
 } from "./api";
 
 const ASSET_TYPES = [
@@ -27,6 +29,9 @@ export default function AssetRegister() {
   const [message, setMessage] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [assetInspections, setAssetInspections] = useState([]);
+  const [inspectionForm, setInspectionForm] = useState({ inspection_date: new Date().toISOString().slice(0, 10), condition_rating: "", defect_status: "", notes: "" });
   const [form, setForm] = useState({
     road_id: "",
     section_id: "",
@@ -86,6 +91,22 @@ export default function AssetRegister() {
     if (!form.road_id) return [];
     return sections.filter((s) => Number(s.road_id) === Number(form.road_id));
   }, [sections, form.road_id]);
+
+  async function openAsset(asset) {
+    setSelectedAsset(asset);
+    try { setAssetInspections(await getAssetInspections(asset.asset_id)); } catch (err) { setMessage(err.message || String(err)); }
+  }
+
+  async function saveAssetInspection(e) {
+    e.preventDefault();
+    if (!selectedAsset) return;
+    try {
+      await createAssetInspection(selectedAsset.asset_id, { ...inspectionForm, condition_rating: inspectionForm.condition_rating === "" ? null : Number(inspectionForm.condition_rating) });
+      setAssetInspections(await getAssetInspections(selectedAsset.asset_id));
+      setMessage("Asset inspection saved.");
+      await load();
+    } catch (err) { setMessage(err.message || String(err)); }
+  }
 
   function updateForm(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -278,6 +299,7 @@ export default function AssetRegister() {
               <th>Chainage km</th>
               <th>Condition</th>
               <th>Description</th>
+              <th>Lifecycle</th>
             </tr>
           </thead>
           <tbody>
@@ -298,6 +320,7 @@ export default function AssetRegister() {
                     <td>{a.chainage_km ?? "—"}</td>
                     <td>{a.condition_rating ?? "—"}</td>
                     <td>{a.description || "—"}</td>
+                    <td><button type="button" onClick={() => openAsset(a)}>Lifecycle</button></td>
                   </tr>
                 );
               })
@@ -305,6 +328,22 @@ export default function AssetRegister() {
           </tbody>
         </table>
       </div>
+      {selectedAsset && (
+        <div className="report-block" style={{ marginTop: 16 }}>
+          <div className="panel-heading" style={{ display: "flex", justifyContent: "space-between" }}>
+            <div><h3>Asset lifecycle — {selectedAsset.asset_code || `Asset #${selectedAsset.asset_id}`}</h3><p>Inspection history and current condition.</p></div>
+            <button type="button" onClick={() => setSelectedAsset(null)}>Close</button>
+          </div>
+          <form onSubmit={saveAssetInspection} className="form-grid">
+            <label>Date<input type="date" value={inspectionForm.inspection_date} onChange={e => setInspectionForm(f => ({...f, inspection_date:e.target.value}))} required /></label>
+            <label>Condition (0–100)<input type="number" min="0" max="100" step="0.1" value={inspectionForm.condition_rating} onChange={e => setInspectionForm(f => ({...f, condition_rating:e.target.value}))} /></label>
+            <label>Defect status<input value={inspectionForm.defect_status} onChange={e => setInspectionForm(f => ({...f, defect_status:e.target.value}))} placeholder="none / minor / major" /></label>
+            <label style={{gridColumn:"1 / -1"}}>Notes<textarea rows={2} value={inspectionForm.notes} onChange={e => setInspectionForm(f => ({...f, notes:e.target.value}))} /></label>
+            <div className="button-row"><button type="submit">Record inspection</button></div>
+          </form>
+          <div className="table-wrap" style={{marginTop:12}}><table><thead><tr><th>Date</th><th>Condition</th><th>Defect</th><th>Notes</th></tr></thead><tbody>{assetInspections.length ? assetInspections.map(i => <tr key={i.asset_inspection_id}><td>{i.inspection_date}</td><td>{i.condition_rating ?? "—"}</td><td>{i.defect_status || "—"}</td><td>{i.notes || "—"}</td></tr>) : <tr><td colSpan={4}>No inspections recorded.</td></tr>}</tbody></table></div>
+        </div>
+      )}
       {message && <p className="form-message">{message}</p>}
     </section>
   );
