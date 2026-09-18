@@ -94,8 +94,8 @@ def list_maintenance_history(maintenance_id: int, db: DbSession, current_user: A
                       .order_by(MaintenanceHistory.changed_at.desc(), MaintenanceHistory.history_id.desc())).all()
 
 
-def _validate_links(db: Session, road_id: int, asset_id: int | None, section_id: int | None, source_defect_id: int | None,
-                    chainage_km: float | None = None):
+def _validate_links(db: Session, road_id: int, section_id: int | None, source_defect_id: int | None,
+                    chainage_km: float | None = None, asset_id: int | None = None):
     section = None
     if asset_id is not None:
         from app.models.road_asset import RoadAsset
@@ -136,7 +136,7 @@ def _validate_dates(planned_date, completed_date):
 def create_maintenance(road_id: int, payload: MaintenanceActivityCreate, db: DbSession, current_user: EngineerUser):
     if db.get(Road, road_id) is None:
         raise HTTPException(status_code=404, detail="Road not found")
-    _validate_links(db, road_id, payload.asset_id, payload.section_id, payload.source_defect_id, payload.chainage_km)
+    _validate_links(db, road_id, payload.section_id, payload.source_defect_id, payload.chainage_km, asset_id=payload.asset_id)
     _validate_dates(payload.planned_date, payload.completed_date)
 
     activity = MaintenanceActivity(
@@ -169,7 +169,7 @@ def update_maintenance(maintenance_id: int, payload: MaintenanceActivityUpdate, 
     section_id = data.get("section_id", activity.section_id)
     source_defect_id = data.get("source_defect_id", activity.source_defect_id)
     chainage_km = data.get("chainage_km", activity.chainage_km)
-    _validate_links(db, activity.road_id, data.get("asset_id", activity.asset_id), section_id, source_defect_id, chainage_km)
+    _validate_links(db, activity.road_id, section_id, source_defect_id, chainage_km, asset_id=data.get("asset_id", activity.asset_id))
     _validate_dates(data.get("planned_date", activity.planned_date), data.get("completed_date", activity.completed_date))
 
     previous_status = activity.status
