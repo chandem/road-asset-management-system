@@ -66,6 +66,18 @@ def list_defect_maintenance(defect_id: int, db: DbSession, current_user: Authent
                       .order_by(MaintenanceActivity.planned_date, MaintenanceActivity.maintenance_id)).all()
 
 
+@router.get("/assets/{asset_id}/maintenance", response_model=list[MaintenanceActivityResponse])
+def list_asset_maintenance(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
+    from app.models.road_asset import RoadAsset
+    if db.get(RoadAsset, asset_id) is None:
+        raise HTTPException(status_code=404, detail="Road asset not found")
+    return db.scalars(
+        select(MaintenanceActivity)
+        .where(MaintenanceActivity.asset_id == asset_id)
+        .order_by(MaintenanceActivity.planned_date.desc(), MaintenanceActivity.maintenance_id.desc())
+    ).all()
+
+
 @router.get("/maintenance/{maintenance_id}", response_model=MaintenanceActivityResponse)
 def get_maintenance(maintenance_id: int, db: DbSession, current_user: AuthenticatedUser):
     activity = db.get(MaintenanceActivity, maintenance_id)
