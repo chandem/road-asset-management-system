@@ -127,6 +127,7 @@ CREATE TABLE inspections (
 CREATE TABLE road_defects (
     defect_id BIGSERIAL PRIMARY KEY,
     inspection_id BIGINT REFERENCES inspections(inspection_id) ON DELETE SET NULL,
+    asset_id BIGINT REFERENCES road_assets(asset_id) ON DELETE SET NULL,
     section_id BIGINT REFERENCES road_sections(section_id) ON DELETE SET NULL,
     client_id VARCHAR(100) UNIQUE,
     defect_type VARCHAR(100) NOT NULL,
@@ -139,6 +140,8 @@ CREATE TABLE road_defects (
     geometry geometry(Point, 4326),
     detected_by VARCHAR(30) NOT NULL DEFAULT 'manual'
 );
+
+CREATE INDEX idx_road_defects_asset ON road_defects(asset_id);
 
 CREATE TABLE maintenance_plans (
     plan_id BIGSERIAL PRIMARY KEY,
