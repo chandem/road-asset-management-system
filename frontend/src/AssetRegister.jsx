@@ -103,7 +103,7 @@ export default function AssetRegister() {
   async function openAsset(asset) {
     setSelectedAsset(asset);
     try {
-      const [inspections, defects, maintenance] = await Promise.all([
+      const [inspections, defects, maintenance, lifecycleSummary] = await Promise.all([
         getAssetInspections(asset.asset_id),
         getAssetDefects(asset.asset_id),
         getAssetMaintenance(asset.asset_id),
@@ -116,7 +116,7 @@ export default function AssetRegister() {
       setAssetDefects(defects);
       setAssetMaintenance(maintenance);
       setAssetWorkOrders(workOrderGroups.flat());
-      setAssetSummary(arguments[0][3]);
+      setAssetSummary(lifecycleSummary);
     } catch (err) {
       setMessage(err.message || String(err));
     }
