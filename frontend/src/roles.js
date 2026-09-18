@@ -8,6 +8,7 @@ export const TAB_ROLES = {
   maintenance: ["admin", "engineer"],
   planning: ["admin", "engineer"],
   workorders: ["admin", "engineer"],
+  assets: ["admin", "engineer", "inspector"],
   condition: ["admin", "engineer", "inspector"],
   analytics: ["admin", "engineer"],
   effectiveness: ["admin", "engineer"],
@@ -39,6 +40,7 @@ export const ALL_NAV_GROUPS = [
       { id: "maintenance", label: "Activities" },
       { id: "planning", label: "Planning" },
       { id: "workorders", label: "Work orders" },
+      { id: "assets", label: "Assets" },
     ],
   },
   {

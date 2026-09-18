@@ -68,6 +68,22 @@ def assets_geojson(road_id: int, db: DbSession, current_user: AuthenticatedUser)
     return {"type": "FeatureCollection", "features": features}
 
 
+@router.get("/assets", response_model=list[RoadAssetResponse])
+def list_all_assets(
+    db: DbSession,
+    current_user: AuthenticatedUser,
+    road_id: int | None = None,
+    asset_type: str | None = None,
+):
+    """Asset register: list assets across roads with optional filters."""
+    query = select(RoadAsset).order_by(RoadAsset.road_id, RoadAsset.chainage_km, RoadAsset.asset_id)
+    if road_id is not None:
+        query = query.where(RoadAsset.road_id == road_id)
+    if asset_type:
+        query = query.where(RoadAsset.asset_type.ilike(asset_type))
+    return db.scalars(query).all()
+
+
 @router.get("/assets/{asset_id}", response_model=RoadAssetResponse)
 def get_asset(asset_id: int, db: DbSession, current_user: AuthenticatedUser):
     asset = db.get(RoadAsset, asset_id)
