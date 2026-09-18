@@ -31,7 +31,36 @@ export default function MaintenanceEffectiveness() {
     const maxDelay = Math.max(...activities.map((item) => Number(item.schedule_delay_days) || 0), 1);
     const completed = activities.filter((item) => item.status === "completed").length;
     const verified = activities.filter((item) => item.verification_result).length;
-    return { activities, maxCost, maxQuantity, maxDelay, completed, verified };
+
+    const byMonth = new Map();
+    activities.forEach((item) => {
+      const date = item.completed_date || item.planned_date;
+      if (!date) return;
+      const month = String(date).slice(0, 7);
+      const row = byMonth.get(month) || {
+        month, activities: 0, completed: 0, verified: 0, estimated: 0, actual: 0, delay: 0,
+      };
+      row.activities += 1;
+      row.completed += item.status === "completed" ? 1 : 0;
+      row.verified += item.verification_result ? 1 : 0;
+      row.estimated += Number(item.estimated_cost) || 0;
+      row.actual += Number(item.actual_cost) || 0;
+      row.delay += Number(item.schedule_delay_days) || 0;
+      byMonth.set(month, row);
+    });
+
+    const trends = [...byMonth.values()]
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .map((row) => ({
+        ...row,
+        completion: row.activities ? Math.round(row.completed / row.activities * 100) : 0,
+        verification: row.activities ? Math.round(row.verified / row.activities * 100) : 0,
+        costVariance: Math.round((row.actual - row.estimated) * 100) / 100,
+        avgDelay: row.activities ? Math.round(row.delay / row.activities * 10) / 10 : 0,
+      }));
+
+    const maxTrendCost = Math.max(...trends.flatMap((row) => [row.estimated, row.actual]), 1);
+    return { activities, maxCost, maxQuantity, maxDelay, completed, verified, trends, maxTrendCost };
   }, [data]);
 
   return (
@@ -59,7 +88,7 @@ export default function MaintenanceEffectiveness() {
 
           <div className="action-panel">
             <h3>Visual analytics</h3>
-            <p>Quick view of execution, cost, quantity, schedule, and verification performance for this road.</p>
+            <p>Quick view of execution, cost, quantity, schedule, verification, and monthly performance trends for this road.</p>
             <div className="summary-grid">
               <div>
                 <strong>Completion</strong>
@@ -76,6 +105,37 @@ export default function MaintenanceEffectiveness() {
                 </div>
               </div>
             </div>
+
+            {visualAnalytics.trends.length > 0 && (
+              <div className="table-wrap">
+                <h4>Monthly trend</h4>
+                <table>
+                  <thead><tr><th>Month</th><th>Completion</th><th>Verification</th><th>Planned cost</th><th>Actual cost</th><th>Avg delay</th></tr></thead>
+                  <tbody>
+                    {visualAnalytics.trends.map((row) => (
+                      <tr key={row.month}>
+                        <td>{row.month}</td>
+                        <td>
+                          <div style={{ minWidth: 120, background: "var(--panel-muted, #eee)", height: 8 }}>
+                            <div style={{ width: `${row.completion}%`, height: "100%", background: "currentColor" }} />
+                          </div>
+                          <small>{row.completion}%</small>
+                        </td>
+                        <td>
+                          <div style={{ minWidth: 120, background: "var(--panel-muted, #eee)", height: 8 }}>
+                            <div style={{ width: `${row.verification}%`, height: "100%", background: "currentColor" }} />
+                          </div>
+                          <small>{row.verification}%</small>
+                        </td>
+                        <td>{row.estimated.toFixed(2)}</td>
+                        <td>{row.actual.toFixed(2)} ({row.costVariance >= 0 ? "+" : ""}{row.costVariance.toFixed(2)})</td>
+                        <td>{row.avgDelay} days</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div className="table-wrap">
               <table>
