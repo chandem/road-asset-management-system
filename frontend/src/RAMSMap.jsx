@@ -179,15 +179,37 @@ export default function RAMSMap({ roadGeoJSON, gpsGeoJSON, sectionGeoJSON, asset
     const priority = conditionPriority(Number.isFinite(score) ? score : 100, critical, high);
     const estimated = maintenance.reduce((sum, item) => sum + (Number(item?.properties?.estimated_cost) || 0), 0);
     const actual = maintenance.reduce((sum, item) => sum + (Number(item?.properties?.actual_cost) || 0), 0);
+    const statusCounts = maintenance.reduce((counts, item) => {
+      const status = String(item?.properties?.status || "unknown").toLowerCase();
+      counts[status] = (counts[status] || 0) + 1;
+      return counts;
+    }, {});
+    const workOrderCount = maintenance.reduce(
+      (sum, item) => sum + (Number(item?.properties?.work_order_count) || 0),
+      0,
+    );
+    const verifiedCount = maintenance.reduce(
+      (sum, item) => sum + (Number(item?.properties?.verified_count) || 0),
+      0,
+    );
+    const activityRows = maintenance.slice(0, 8).map((item) => {
+      const props = item?.properties || {};
+      const label = props.activity_type || props.maintenance_id || "Maintenance activity";
+      const status = props.status || "unknown";
+      return `<li><strong>${escapeHtml(label)}</strong> — ${escapeHtml(status)}${props.priority ? ` · ${escapeHtml(props.priority)} priority` : ""}</li>`;
+    }).join("");
     layer.bindPopup(`<div class="rams-popup"><strong>${escapeHtml(feature?.properties?.section_code || `Section ${sectionId}`)}</strong><table>
       <tr><td><strong>Condition</strong></td><td>${Number.isFinite(score) ? score.toFixed(1) : "Not rated"}</td></tr>
       <tr><td><strong>Category</strong></td><td>${conditionCategory(score)}</td></tr>
       <tr><td><strong>Maintenance priority</strong></td><td>${priority}</td></tr>
       <tr><td><strong>Defects</strong></td><td>${defects.length} (${critical} critical, ${high} high)</td></tr>
       <tr><td><strong>Maintenance activities</strong></td><td>${maintenance.length}</td></tr>
+      <tr><td><strong>Maintenance status</strong></td><td>${escapeHtml(Object.entries(statusCounts).map(([status, count]) => `${status}: ${count}`).join(", ") || "none")}</td></tr>
+      <tr><td><strong>Work orders</strong></td><td>${workOrderCount || "Not recorded"}</td></tr>
+      <tr><td><strong>Verified</strong></td><td>${verifiedCount || "Not recorded"}</td></tr>
       <tr><td><strong>Estimated cost</strong></td><td>${estimated.toLocaleString()}</td></tr>
       <tr><td><strong>Actual cost</strong></td><td>${actual.toLocaleString()}</td></tr>
-    </table><small>Based on recorded condition, defects and maintenance records.</small></div>`);
+    </table>${activityRows ? `<strong>Recent maintenance</strong><ul>${activityRows}</ul>` : ""}<small>Based on recorded condition, defects and maintenance records.</small></div>`);
   }, [filtered.defectGeoJSON, filtered.maintenanceGeoJSON]);
 
   return (
