@@ -10,6 +10,7 @@ from app.models.inspection import Inspection
 from app.models.maintenance_activity import MaintenanceActivity
 from app.models.work_order import WorkOrder
 from app.models.work_order_execution import WorkOrderExecution
+from app.models.work_order_verification import WorkOrderVerification
 from app.models.road_section import RoadSection
 from pydantic import BaseModel
 
@@ -113,6 +114,12 @@ def road_maintenance_effectiveness(
         actual_quantity = None if execution is None or execution.actual_quantity is None else float(execution.actual_quantity)
         quantity_variance = None if planned_quantity is None or actual_quantity is None else round(actual_quantity - planned_quantity, 3)
         quantity_variance_percent = None if planned_quantity in (None, 0) or quantity_variance is None else round((quantity_variance / planned_quantity) * 100, 2)
+        verification = db.scalar(
+            select(WorkOrderVerification.result)
+            .join(WorkOrder, WorkOrder.work_order_id == WorkOrderVerification.work_order_id)
+            .where(WorkOrder.maintenance_id == activity.maintenance_id)
+            .limit(1)
+        )
         schedule_delay_days = None
         if activity.planned_date and activity.completed_date:
             schedule_delay_days = max((activity.completed_date - activity.planned_date).days, 0)
@@ -136,6 +143,7 @@ def road_maintenance_effectiveness(
                 planned_date=activity.planned_date.isoformat() if activity.planned_date else None,
                 completed_date=activity.completed_date.isoformat() if activity.completed_date else None,
                 schedule_delay_days=schedule_delay_days,
+                verification_result=verification,
             )
         )
 
