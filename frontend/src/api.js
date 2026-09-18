@@ -128,3 +128,6 @@ export { API_BASE };
 export function getWorkOrderExecution(workOrderId) { return request(`/work-orders/${workOrderId}/execution`); }
 export function createWorkOrderExecution(workOrderId, payload) { return request(`/work-orders/${workOrderId}/execution`, { method: "POST", body: JSON.stringify(payload) }); }
 export function updateWorkOrderExecution(workOrderId, payload) { return request(`/work-orders/${workOrderId}/execution`, { method: "PATCH", body: JSON.stringify(payload) }); }
+
+export function getWorkOrderVerification(workOrderId) { return request(`/work-orders/${workOrderId}/verification`); }
+export function createWorkOrderVerification(workOrderId, payload) { return request(`/work-orders/${workOrderId}/verification`, { method: "POST", body: JSON.stringify(payload) }); }
