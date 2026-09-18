@@ -175,7 +175,20 @@ def create_execution(work_order_id: int, payload: WorkOrderExecutionCreate, db: 
         updated_at=datetime.now(timezone.utc),
     )
     db.add(execution)
+    if execution.completed_at:
+        maintenance = db.get(MaintenanceActivity, order.maintenance_id)
+        if maintenance is not None:
+            maintenance.completed_date = execution.completed_at.date()
+            if execution.actual_cost is not None:
+                maintenance.actual_cost = execution.actual_cost
     try:
+        db.flush()
+        _add_history(db, order, current_user.user_id, "execution_created", None, {
+            "started_at": execution.started_at.isoformat() if execution.started_at else None,
+            "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
+            "actual_quantity": float(execution.actual_quantity) if execution.actual_quantity is not None else None,
+            "actual_cost": float(execution.actual_cost) if execution.actual_cost is not None else None,
+        })
         db.commit()
         db.refresh(execution)
     except Exception:
@@ -189,12 +202,34 @@ def update_execution(work_order_id: int, payload: WorkOrderExecutionUpdate, db: 
     execution = db.scalar(select(WorkOrderExecution).where(WorkOrderExecution.work_order_id == work_order_id))
     if execution is None:
         raise HTTPException(status_code=404, detail="Work order execution not found")
+    old_execution = {
+        "started_at": execution.started_at.isoformat() if execution.started_at else None,
+        "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
+        "actual_quantity": float(execution.actual_quantity) if execution.actual_quantity is not None else None,
+        "actual_cost": float(execution.actual_cost) if execution.actual_cost is not None else None,
+    }
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(execution, field, value)
     if execution.started_at and execution.completed_at and execution.completed_at < execution.started_at:
         raise HTTPException(status_code=400, detail="completed_at cannot be before started_at")
     execution.updated_at = datetime.now(timezone.utc)
+    maintenance = db.get(MaintenanceActivity, order.maintenance_id)
+    if maintenance is not None:
+        if execution.completed_at:
+            maintenance.completed_date = execution.completed_at.date()
+        if execution.actual_cost is not None:
+            maintenance.actual_cost = execution.actual_cost
+    new_execution = {
+        "started_at": execution.started_at.isoformat() if execution.started_at else None,
+        "completed_at": execution.completed_at.isoformat() if execution.completed_at else None,
+        "actual_quantity": float(execution.actual_quantity) if execution.actual_quantity is not None else None,
+        "actual_cost": float(execution.actual_cost) if execution.actual_cost is not None else None,
+    }
+    changed = {key: value for key, value in new_execution.items() if old_execution.get(key) != value}
     try:
+        db.flush()
+        if changed:
+            _add_history(db, order, current_user.user_id, "execution_updated", old_execution, changed)
         db.commit()
         db.refresh(execution)
     except Exception:
