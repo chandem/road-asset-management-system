@@ -19,6 +19,7 @@ import InspectionDefectForm from "./components/InspectionDefectForm";
 import Reports from "./Reports";
 import WorkOrderManagement from "./WorkOrderManagement";
 import AssetRegister from "./AssetRegister";
+import AuditHistory from "./AuditHistory";
 import MaintenancePlanning from "./MaintenancePlanning";
 import ConditionAssessment from "./ConditionAssessment";
 import MaintenanceAnalytics from "./MaintenanceAnalytics";
@@ -397,6 +398,8 @@ function App({ user }) {
         {activeTab === "assets" && <AssetRegister />}
 
         {activeTab === "reports" && <Reports />}
+
+        {activeTab === "audit" && <AuditHistory />}
 
         {showForm && (
           <InspectionDefectForm formType={formType} form={form} update={update} sections={sections} submitForm={submitForm} saving={saving} message={message} onClose={() => setShowForm(false)} />
