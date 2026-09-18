@@ -41,7 +41,8 @@ function App({ user }) {
   const [aiMessage, setAiMessage] = useState("");
   const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
   const [summaryCounts, setSummaryCounts] = useState(null);
-  const [attention, setAttention] = useState(null);\n  const [kpis, setKpis] = useState(null);
+  const [attention, setAttention] = useState(null);
+  const [kpis, setKpis] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [maintenanceRoadId, setMaintenanceRoadId] = useState(""); const [maintenance, setMaintenance] = useState([]);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
