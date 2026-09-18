@@ -222,6 +222,19 @@ def dashboard_kpis(db: DbSession, current_user: AuthenticatedUser) -> dict[str, 
               WorkOrderVerification.work_order_id == WorkOrder.work_order_id)
     ) or 0)
 
+    accepted = int(db.scalar(
+        select(func.count()).select_from(WorkOrderVerification)
+        .where(WorkOrderVerification.result == "accepted")
+    ) or 0)
+    accepted_with_observations = int(db.scalar(
+        select(func.count()).select_from(WorkOrderVerification)
+        .where(WorkOrderVerification.result == "accepted with observations")
+    ) or 0)
+    rejected = int(db.scalar(
+        select(func.count()).select_from(WorkOrderVerification)
+        .where(WorkOrderVerification.result == "rejected")
+    ) or 0)
+
     return {
         "as_of": date.today().isoformat(),
         "maintenance": {
@@ -240,5 +253,9 @@ def dashboard_kpis(db: DbSession, current_user: AuthenticatedUser) -> dict[str, 
             "total": _count(db, WorkOrder),
             "completed": int(db.scalar(select(func.count()).select_from(WorkOrder).where(WorkOrder.status == "completed")) or 0),
             "verified": verified,
+            "verification_rate_percent": None if completed_maintenance == 0 else round(verified / completed_maintenance * 100, 2),
+            "accepted": accepted,
+            "accepted_with_observations": accepted_with_observations,
+            "rejected": rejected,
         },
     }
