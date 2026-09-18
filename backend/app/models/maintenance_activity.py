@@ -15,7 +15,7 @@ class MaintenanceActivity(Base):
     road_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("rams.roads.road_id", ondelete="SET NULL")
     )
-    section_id: Mapped[Optional[int]] = mapped_column(
+    asset_id: Mapped[Optional[int]] = mapped_column(\n        BigInteger, ForeignKey("rams.road_assets.asset_id", ondelete="SET NULL")\n    )\n    section_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("rams.road_sections.section_id", ondelete="SET NULL")
     )
     plan_id: Mapped[Optional[int]] = mapped_column(
