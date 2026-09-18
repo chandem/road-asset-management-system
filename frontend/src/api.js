@@ -56,6 +56,9 @@ export function getRoadAssets(roadId) { return request(`/roads/${roadId}/assets`
 export function getAsset(assetId) { return request(`/assets/${assetId}`); }
 export function getAssetInspections(assetId) { return request(`/assets/${assetId}/inspections`); }
 export function createAssetInspection(assetId, payload) { return request(`/assets/${assetId}/inspections`, { method: "POST", body: JSON.stringify(payload) }); }
+export function getAssetDefects(assetId) { return request(`/assets/${assetId}/defects`); }
+export function getAssetMaintenance(assetId) { return request(`/assets/${assetId}/maintenance`); }
+export function getMaintenanceWorkOrders(maintenanceId) { return request(`/maintenance/${maintenanceId}/work-orders`); }
 export function createRoadAsset(roadId, payload) {
   return request(`/roads/${roadId}/assets`, { method: "POST", body: JSON.stringify(payload) });
 }
