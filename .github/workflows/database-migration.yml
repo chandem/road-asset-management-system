@@ -1,0 +1,36 @@
+name: RAMS Database Migration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    name: Run Alembic migrations
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.RAMS_DATABASE_URL }}
+      JWT_SECRET_KEY: ${{ secrets.RAMS_JWT_SECRET_KEY }}
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Check database URL is configured
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "RAMS_DATABASE_URL GitHub secret is not configured."
+            exit 1
+          fi
+
+      - name: Run Alembic migrations
+        working-directory: backend
+        run: alembic upgrade head
