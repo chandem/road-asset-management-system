@@ -2,11 +2,13 @@
 
 Revision ID: 0008_asset_replacement_planning
 Revises: 0007_asset_defect_link
+
+Idempotent: columns may already exist from an updated schema.sql.
 """
+from __future__ import annotations
 
 from alembic import op
-import sqlalchemy as sa
-
+from sqlalchemy import text
 
 revision = "0008_asset_replacement_planning"
 down_revision = "0007_asset_defect_link"
@@ -15,24 +17,86 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("road_assets", sa.Column("criticality", sa.Integer(), nullable=False, server_default="3"), schema="rams")
-    op.add_column("road_assets", sa.Column("commissioning_year", sa.Integer(), nullable=True), schema="rams")
-    op.add_column("road_assets", sa.Column("expected_life_years", sa.Integer(), nullable=True), schema="rams")
-    op.add_column("road_assets", sa.Column("replacement_cost", sa.Numeric(14, 2), nullable=True), schema="rams")
-    op.add_column("road_assets", sa.Column("replacement_threshold", sa.Numeric(5, 2), nullable=False, server_default="40"), schema="rams")
-    op.create_check_constraint("ck_road_assets_criticality", "road_assets", "criticality BETWEEN 1 AND 5", schema="rams")
-    op.create_check_constraint("ck_road_assets_expected_life", "road_assets", "expected_life_years IS NULL OR expected_life_years >= 1", schema="rams")
-    op.create_check_constraint("ck_road_assets_replacement_cost", "road_assets", "replacement_cost IS NULL OR replacement_cost >= 0", schema="rams")
-    op.create_check_constraint("ck_road_assets_replacement_threshold", "road_assets", "replacement_threshold BETWEEN 0 AND 100", schema="rams")
+    conn = op.get_bind()
+    conn.execute(text("SET search_path TO rams, public"))
+
+    conn.execute(text("""
+        ALTER TABLE road_assets
+            ADD COLUMN IF NOT EXISTS criticality INTEGER NOT NULL DEFAULT 3
+    """))
+    conn.execute(text("""
+        ALTER TABLE road_assets
+            ADD COLUMN IF NOT EXISTS commissioning_year INTEGER
+    """))
+    conn.execute(text("""
+        ALTER TABLE road_assets
+            ADD COLUMN IF NOT EXISTS expected_life_years INTEGER
+    """))
+    conn.execute(text("""
+        ALTER TABLE road_assets
+            ADD COLUMN IF NOT EXISTS replacement_cost NUMERIC(14, 2)
+    """))
+    conn.execute(text("""
+        ALTER TABLE road_assets
+            ADD COLUMN IF NOT EXISTS replacement_threshold NUMERIC(5, 2)
+            NOT NULL DEFAULT 40
+    """))
+
+    conn.execute(text("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'ck_road_assets_criticality'
+                  AND conrelid = 'rams.road_assets'::regclass
+            ) THEN
+                ALTER TABLE road_assets
+                    ADD CONSTRAINT ck_road_assets_criticality
+                    CHECK (criticality BETWEEN 1 AND 5);
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'ck_road_assets_expected_life'
+                  AND conrelid = 'rams.road_assets'::regclass
+            ) THEN
+                ALTER TABLE road_assets
+                    ADD CONSTRAINT ck_road_assets_expected_life
+                    CHECK (expected_life_years IS NULL OR expected_life_years >= 1);
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'ck_road_assets_replacement_cost'
+                  AND conrelid = 'rams.road_assets'::regclass
+            ) THEN
+                ALTER TABLE road_assets
+                    ADD CONSTRAINT ck_road_assets_replacement_cost
+                    CHECK (replacement_cost IS NULL OR replacement_cost >= 0);
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'ck_road_assets_replacement_threshold'
+                  AND conrelid = 'rams.road_assets'::regclass
+            ) THEN
+                ALTER TABLE road_assets
+                    ADD CONSTRAINT ck_road_assets_replacement_threshold
+                    CHECK (replacement_threshold BETWEEN 0 AND 100);
+            END IF;
+        END $$;
+    """))
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_road_assets_replacement_threshold", "road_assets", schema="rams", type_="check")
-    op.drop_constraint("ck_road_assets_replacement_cost", "road_assets", schema="rams", type_="check")
-    op.drop_constraint("ck_road_assets_expected_life", "road_assets", schema="rams", type_="check")
-    op.drop_constraint("ck_road_assets_criticality", "road_assets", schema="rams", type_="check")
-    op.drop_column("road_assets", "replacement_threshold", schema="rams")
-    op.drop_column("road_assets", "replacement_cost", schema="rams")
-    op.drop_column("road_assets", "expected_life_years", schema="rams")
-    op.drop_column("road_assets", "commissioning_year", schema="rams")
-    op.drop_column("road_assets", "criticality", schema="rams")
+    conn = op.get_bind()
+    conn.execute(text("SET search_path TO rams, public"))
+    conn.execute(text("ALTER TABLE road_assets DROP CONSTRAINT IF EXISTS ck_road_assets_replacement_threshold"))
+    conn.execute(text("ALTER TABLE road_assets DROP CONSTRAINT IF EXISTS ck_road_assets_replacement_cost"))
+    conn.execute(text("ALTER TABLE road_assets DROP CONSTRAINT IF EXISTS ck_road_assets_expected_life"))
+    conn.execute(text("ALTER TABLE road_assets DROP CONSTRAINT IF EXISTS ck_road_assets_criticality"))
+    conn.execute(text("ALTER TABLE road_assets DROP COLUMN IF EXISTS replacement_threshold"))
+    conn.execute(text("ALTER TABLE road_assets DROP COLUMN IF EXISTS replacement_cost"))
+    conn.execute(text("ALTER TABLE road_assets DROP COLUMN IF EXISTS expected_life_years"))
+    conn.execute(text("ALTER TABLE road_assets DROP COLUMN IF EXISTS commissioning_year"))
+    conn.execute(text("ALTER TABLE road_assets DROP COLUMN IF EXISTS criticality"))
