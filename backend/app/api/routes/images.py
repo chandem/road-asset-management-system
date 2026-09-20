@@ -1,7 +1,6 @@
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import func, select
@@ -13,13 +12,19 @@ from app.models.image import Image
 from app.models.inspection import Inspection
 from app.models.road_defect import RoadDefect
 from app.schemas.image import ImageResponse
+from app.services.object_storage import StorageError, get_storage
 
 router = APIRouter(tags=["Images"])
 DbSession = Annotated[Session, Depends(get_db)]
 
-UPLOAD_DIR = Path("uploads/images")
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
+
+
+@router.get("/storage/status")
+def storage_status(current_user: AuthenticatedUser):
+    """Ops helper: which photo backend is active."""
+    return get_storage().status()
 
 
 @router.get("/images", response_model=list[ImageResponse])
@@ -47,7 +52,9 @@ async def upload_image(
     longitude: float | None = Form(default=None),
 ):
     if file.content_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=400, detail="Only JPEG, PNG and WebP images are allowed")
+        raise HTTPException(
+            status_code=400, detail="Only JPEG, PNG and WebP images are allowed"
+        )
 
     if inspection_id is not None and db.get(Inspection, inspection_id) is None:
         raise HTTPException(status_code=400, detail="Inspection not found")
@@ -59,7 +66,10 @@ async def upload_image(
         if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
             raise HTTPException(status_code=400, detail="Invalid GPS coordinates")
     elif latitude is not None or longitude is not None:
-        raise HTTPException(status_code=400, detail="Latitude and longitude must be provided together")
+        raise HTTPException(
+            status_code=400,
+            detail="Latitude and longitude must be provided together",
+        )
 
     captured_at_value = None
     if captured_at:
@@ -75,11 +85,15 @@ async def upload_image(
     if len(data) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="Image must be 10 MB or smaller")
 
-    suffix = Path(file.filename or "image.jpg").suffix.lower() or ".jpg"
-    stored_name = f"{uuid4().hex}{suffix}"
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    file_path = UPLOAD_DIR / stored_name
-    file_path.write_bytes(data)
+    storage = get_storage()
+    try:
+        stored_ref = storage.store(
+            data,
+            original_name=file.filename or "image.jpg",
+            content_type=file.content_type or "image/jpeg",
+        )
+    except StorageError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     geometry = None
     if latitude is not None and longitude is not None:
@@ -88,8 +102,8 @@ async def upload_image(
     image = Image(
         inspection_id=inspection_id,
         defect_id=defect_id,
-        file_name=file.filename or stored_name,
-        file_path=str(file_path),
+        file_name=file.filename or Path(stored_ref).name,
+        file_path=stored_ref,
         captured_at=captured_at_value,
         latitude=latitude,
         longitude=longitude,
@@ -101,7 +115,7 @@ async def upload_image(
         db.commit()
     except Exception:
         db.rollback()
-        file_path.unlink(missing_ok=True)
+        storage.delete(stored_ref)
         raise HTTPException(status_code=400, detail="Could not create image record")
 
     db.refresh(image)
