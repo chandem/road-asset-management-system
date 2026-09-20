@@ -9,6 +9,7 @@ Usage (from backend/):
     export JWT_SECRET_KEY=your-secret-at-least-32-characters-long
     export PYTHONPATH=.
     python scripts/seed_demo_data.py
+    python scripts/seed_demo_data.py --dry-run
 
 Docker:
 
@@ -22,6 +23,7 @@ Note: road_sections.length_km is GENERATED ALWAYS — do not set it on insert.
 """
 from __future__ import annotations
 
+import argparse
 import os
 from datetime import date
 
@@ -46,6 +48,10 @@ DEMO_PASSWORD = "DemoPass123!"
 ROAD_A_LINE = "LINESTRING(38.75 9.00, 38.85 9.02, 38.95 9.05)"
 ROAD_B_LINE = "LINESTRING(38.70 8.95, 38.80 8.98, 38.90 9.00)"
 ROAD_C_LINE = "LINESTRING(38.78 9.03, 38.88 9.06, 38.98 9.08)"
+
+
+class DryRunRollback(Exception):
+    """Signal that the seed transaction should be rolled back intentionally."""
 
 
 def validate_environment() -> None:
@@ -132,172 +138,194 @@ def get_or_create_section(db, **kwargs) -> RoadSection:
     return section
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="validate and preview the seed without committing database changes",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
     validate_environment()
-    print("Seeding RAMS demo data…")
-    # Session.begin() commits on success and rolls back automatically on failure.
-    with SessionLocal.begin() as db:
-        organization = get_or_create_organization(db)
-        get_or_create_user(
-            db,
-            organization_id=organization.organization_id,
-            username="admin",
-            full_name="RAMS Administrator",
-            role="admin",
-            email="admin@rams.demo",
-        )
-        inspector = get_or_create_user(
-            db,
-            organization_id=organization.organization_id,
-            username="inspector",
-            full_name="Field Inspector",
-            role="inspector",
-            email="inspector@rams.demo",
-        )
-        get_or_create_user(
-            db,
-            organization_id=organization.organization_id,
-            username="engineer",
-            full_name="Road Engineer",
-            role="engineer",
-            email="engineer@rams.demo",
-        )
+    mode = "DRY RUN — no changes will be committed" if args.dry_run else "Seeding RAMS demo data…"
+    print(mode)
 
-        road_a = get_or_create_road(
-            db,
-            organization_id=organization.organization_id,
-            road_code="A001",
-            road_name="Addis–Bishoftu Corridor",
-            road_class="primary",
-            surface_type="asphalt",
-            start_location="Addis Ababa",
-            end_location="Bishoftu",
-            total_length_km=12.5,
-            geometry=WKTElement(ROAD_A_LINE, srid=4326),
-            status="active",
-        )
-        road_b = get_or_create_road(
-            db,
-            organization_id=organization.organization_id,
-            road_code="A002",
-            road_name="Ring Road Segment West",
-            road_class="secondary",
-            surface_type="asphalt",
-            start_location="CMC",
-            end_location="Mexico Square",
-            total_length_km=8.0,
-            geometry=WKTElement(ROAD_B_LINE, srid=4326),
-            status="active",
-        )
-        road_c = get_or_create_road(
-            db,
-            organization_id=organization.organization_id,
-            road_code="A003",
-            road_name="Bole–Airport Link",
-            road_class="primary",
-            surface_type="asphalt",
-            start_location="Bole",
-            end_location="Airport",
-            total_length_km=6.0,
-            geometry=WKTElement(ROAD_C_LINE, srid=4326),
-            status="active",
-        )
-
-        get_or_create_section(
-            db,
-            road_id=road_a.road_id,
-            section_code="A001-S1",
-            start_chainage=0.0,
-            end_chainage=5.0,
-            surface_type="asphalt",
-            condition_rating=72.0,
-            geometry=WKTElement("LINESTRING(38.75 9.00, 38.85 9.02)", srid=4326),
-        )
-        sec_a2 = get_or_create_section(
-            db,
-            road_id=road_a.road_id,
-            section_code="A001-S2",
-            start_chainage=5.0,
-            end_chainage=12.5,
-            surface_type="asphalt",
-            condition_rating=58.0,
-            geometry=WKTElement("LINESTRING(38.85 9.02, 38.95 9.05)", srid=4326),
-        )
-        get_or_create_section(
-            db,
-            road_id=road_b.road_id,
-            section_code="A002-S1",
-            start_chainage=0.0,
-            end_chainage=8.0,
-            surface_type="asphalt",
-            condition_rating=81.0,
-            geometry=WKTElement("LINESTRING(38.70 8.95, 38.90 9.00)", srid=4326),
-        )
-        get_or_create_section(
-            db,
-            road_id=road_c.road_id,
-            section_code="A003-S1",
-            start_chainage=0.0,
-            end_chainage=3.0,
-            surface_type="asphalt",
-            condition_rating=88.0,
-            geometry=WKTElement("LINESTRING(38.78 9.03, 38.88 9.06)", srid=4326),
-        )
-        get_or_create_section(
-            db,
-            road_id=road_c.road_id,
-            section_code="A003-S2",
-            start_chainage=3.0,
-            end_chainage=6.0,
-            surface_type="asphalt",
-            condition_rating=64.0,
-            geometry=WKTElement("LINESTRING(38.88 9.06, 38.98 9.08)", srid=4326),
-        )
-
-        # One inspection + defect if none exist for section A001-S2
-        existing_insp = db.scalar(
-            select(Inspection).where(Inspection.section_id == sec_a2.section_id).limit(1)
-        )
-        if existing_insp is None:
-            insp = Inspection(
-                section_id=sec_a2.section_id,
-                inspector_id=inspector.user_id,
-                inspection_date=date(2026, 9, 1),
-                condition_rating=55.0,
-                weather="clear",
-                notes="Routine survey — surface distress observed.",
+    try:
+        # Session.begin() commits on success and rolls back on failure. A dry run
+        # raises after all operations so its transaction is always rolled back.
+        with SessionLocal.begin() as db:
+            organization = get_or_create_organization(db)
+            get_or_create_user(
+                db,
+                organization_id=organization.organization_id,
+                username="admin",
+                full_name="RAMS Administrator",
+                role="admin",
+                email="admin@rams.demo",
             )
-            db.add(insp)
-            db.flush()
-            defect = RoadDefect(
-                inspection_id=insp.inspection_id,
-                section_id=sec_a2.section_id,
-                defect_type="pothole",
-                severity="high",
-                chainage_km=7.2,
-                length_m=1.5,
-                width_m=0.8,
-                depth_mm=60,
-                description="Pothole near km 7.2 requiring patching.",
-                geometry=WKTElement("POINT(38.90 9.04)", srid=4326),
-                detected_by="manual",
+            inspector = get_or_create_user(
+                db,
+                organization_id=organization.organization_id,
+                username="inspector",
+                full_name="Field Inspector",
+                role="inspector",
+                email="inspector@rams.demo",
             )
-            db.add(defect)
-            db.flush()
-            maint = MaintenanceActivity(
+            get_or_create_user(
+                db,
+                organization_id=organization.organization_id,
+                username="engineer",
+                full_name="Road Engineer",
+                role="engineer",
+                email="engineer@rams.demo",
+            )
+
+            road_a = get_or_create_road(
+                db,
+                organization_id=organization.organization_id,
+                road_code="A001",
+                road_name="Addis–Bishoftu Corridor",
+                road_class="primary",
+                surface_type="asphalt",
+                start_location="Addis Ababa",
+                end_location="Bishoftu",
+                total_length_km=12.5,
+                geometry=WKTElement(ROAD_A_LINE, srid=4326),
+                status="active",
+            )
+            road_b = get_or_create_road(
+                db,
+                organization_id=organization.organization_id,
+                road_code="A002",
+                road_name="Ring Road Segment West",
+                road_class="secondary",
+                surface_type="asphalt",
+                start_location="CMC",
+                end_location="Mexico Square",
+                total_length_km=8.0,
+                geometry=WKTElement(ROAD_B_LINE, srid=4326),
+                status="active",
+            )
+            road_c = get_or_create_road(
+                db,
+                organization_id=organization.organization_id,
+                road_code="A003",
+                road_name="Bole–Airport Link",
+                road_class="primary",
+                surface_type="asphalt",
+                start_location="Bole",
+                end_location="Airport",
+                total_length_km=6.0,
+                geometry=WKTElement(ROAD_C_LINE, srid=4326),
+                status="active",
+            )
+
+            get_or_create_section(
+                db,
                 road_id=road_a.road_id,
-                section_id=sec_a2.section_id,
-                source_defect_id=defect.defect_id,
-                activity_type="Pothole patching",
-                priority="high",
-                planned_date=date(2026, 9, 20),
-                estimated_cost=45000,
-                contractor="Demo Contractor PLC",
-                status="planned",
-                description="Cold-mix patch at chainage 7.2 km.",
+                section_code="A001-S1",
+                start_chainage=0.0,
+                end_chainage=5.0,
+                surface_type="asphalt",
+                condition_rating=72.0,
+                geometry=WKTElement("LINESTRING(38.75 9.00, 38.85 9.02)", srid=4326),
             )
-            db.add(maint)
-            print("  + inspection, defect, and maintenance for A001-S2")
+            sec_a2 = get_or_create_section(
+                db,
+                road_id=road_a.road_id,
+                section_code="A001-S2",
+                start_chainage=5.0,
+                end_chainage=12.5,
+                surface_type="asphalt",
+                condition_rating=58.0,
+                geometry=WKTElement("LINESTRING(38.85 9.02, 38.95 9.05)", srid=4326),
+            )
+            get_or_create_section(
+                db,
+                road_id=road_b.road_id,
+                section_code="A002-S1",
+                start_chainage=0.0,
+                end_chainage=8.0,
+                surface_type="asphalt",
+                condition_rating=81.0,
+                geometry=WKTElement("LINESTRING(38.70 8.95, 38.90 9.00)", srid=4326),
+            )
+            get_or_create_section(
+                db,
+                road_id=road_c.road_id,
+                section_code="A003-S1",
+                start_chainage=0.0,
+                end_chainage=3.0,
+                surface_type="asphalt",
+                condition_rating=88.0,
+                geometry=WKTElement("LINESTRING(38.78 9.03, 38.88 9.06)", srid=4326),
+            )
+            get_or_create_section(
+                db,
+                road_id=road_c.road_id,
+                section_code="A003-S2",
+                start_chainage=3.0,
+                end_chainage=6.0,
+                surface_type="asphalt",
+                condition_rating=64.0,
+                geometry=WKTElement("LINESTRING(38.88 9.06, 38.98 9.08)", srid=4326),
+            )
+
+            # One inspection + defect if none exist for section A001-S2
+            existing_insp = db.scalar(
+                select(Inspection).where(Inspection.section_id == sec_a2.section_id).limit(1)
+            )
+            if existing_insp is None:
+                insp = Inspection(
+                    section_id=sec_a2.section_id,
+                    inspector_id=inspector.user_id,
+                    inspection_date=date(2026, 9, 1),
+                    condition_rating=55.0,
+                    weather="clear",
+                    notes="Routine survey — surface distress observed.",
+                )
+                db.add(insp)
+                db.flush()
+                defect = RoadDefect(
+                    inspection_id=insp.inspection_id,
+                    section_id=sec_a2.section_id,
+                    defect_type="pothole",
+                    severity="high",
+                    chainage_km=7.2,
+                    length_m=1.5,
+                    width_m=0.8,
+                    depth_mm=60,
+                    description="Pothole near km 7.2 requiring patching.",
+                    geometry=WKTElement("POINT(38.90 9.04)", srid=4326),
+                    detected_by="manual",
+                )
+                db.add(defect)
+                db.flush()
+                db.add(
+                    MaintenanceActivity(
+                        road_id=road_a.road_id,
+                        section_id=sec_a2.section_id,
+                        source_defect_id=defect.defect_id,
+                        activity_type="Pothole patching",
+                        priority="high",
+                        planned_date=date(2026, 9, 20),
+                        estimated_cost=45000,
+                        contractor="Demo Contractor PLC",
+                        status="planned",
+                        description="Cold-mix patch at chainage 7.2 km.",
+                    )
+                )
+                print("  + inspection, defect, and maintenance for A001-S2")
+
+            if args.dry_run:
+                raise DryRunRollback
+    except DryRunRollback:
+        print("Dry run complete: transaction rolled back; no database changes made.")
+        return
 
     print("Done.")
     print(f"Demo logins (password: {DEMO_PASSWORD}):")
