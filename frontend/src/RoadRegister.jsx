@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   archiveRoad,
   createRoad,
+  deleteRoad,
   generateRoadSections,
   getRoadSections,
   getRoads,
@@ -53,6 +54,12 @@ const selectedRoadStyles = `
   }
   .road-register .selected-action {
     background: #d8bf82 !important; color: #2d2418 !important; border-color: #b68d45 !important; font-weight: 800;
+  }
+  .road-register .danger-action {
+    color: #991b1b !important; border-color: #fca5a5 !important;
+  }
+  .road-register .danger-action:hover {
+    background: #fef2f2 !important;
   }
   .road-draw-panel {
     margin: 1rem 0 1.25rem; padding: 1rem;
@@ -223,6 +230,41 @@ export default function RoadRegister() {
     }
   }
 
+  async function handleDelete(road) {
+    const ok = window.confirm(
+      `PERMANENTLY DELETE road ${road.road_code} (${road.road_name})?\n\n` +
+        "This removes the road and related sections/assets where the database allows CASCADE.\n" +
+        "This cannot be undone. Prefer Archive if you only want to hide it.",
+    );
+    if (!ok) return;
+    const typed = window.prompt(
+      `Type the road code "${road.road_code}" to confirm permanent delete:`,
+    );
+    if (typed !== road.road_code) {
+      setMessage("Delete cancelled — road code did not match.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await deleteRoad(road.road_id);
+      setMessage(`Deleted ${road.road_code} from the system.`);
+      if (selectedId === road.road_id) {
+        setSelectedId(null);
+        setSections([]);
+      }
+      if (editingId === road.road_id) {
+        setEditingId(null);
+        setForm(EMPTY_FORM);
+      }
+      await loadRoads();
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleGenerateSections(replace = false) {
     if (!selectedId) return;
     if (replace && !window.confirm("Replace all existing sections for this road?")) return;
@@ -261,8 +303,8 @@ export default function RoadRegister() {
         <div>
           <h2>Road register</h2>
           <p>
-            Add, edit, and archive roads. Draw geometry on the map or paste WKT.
-            Automatic section generation (default 500 m) saves to PostgreSQL/PostGIS.
+            Add, edit, archive, or permanently delete roads. Draw geometry on the map or paste WKT.
+            Section generation (default 500 m) saves to PostgreSQL/PostGIS.
           </p>
         </div>
         <button type="button" onClick={startCreate}>+ Add road</button>
@@ -475,6 +517,16 @@ export default function RoadRegister() {
                         Archive
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="danger-action"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleDelete(road);
+                      }}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               );
