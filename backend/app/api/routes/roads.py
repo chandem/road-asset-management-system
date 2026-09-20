@@ -1,7 +1,7 @@
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.core.security import AuthenticatedUser, EngineerUser
@@ -24,11 +24,11 @@ DbSession = Annotated[Session, Depends(get_db)]
 def _apply_geometry(road: Road, geometry_wkt: Optional[str]) -> None:
     if geometry_wkt is None:
         return
-    text = geometry_wkt.strip()
-    if not text:
+    text_wkt = geometry_wkt.strip()
+    if not text_wkt:
         road.geometry = None
         return
-    road.geometry = func.ST_GeomFromText(text, 4326)
+    road.geometry = func.ST_GeomFromText(text_wkt, 4326)
 
 
 @router.get("", response_model=list[RoadResponse])
@@ -194,11 +194,7 @@ def generate_sections(
     db: DbSession,
     current_user: EngineerUser,
 ):
-    """Split a road into fixed-length sections (default 500 m).
-
-    Uses total_length_km when set; otherwise derives length from PostGIS geometry.
-    When geometry exists, each section gets a LINESTRING substring.
-    """
+    """Split a road into fixed-length sections (default 500 m)."""
     road = db.get(Road, road_id)
     if road is None:
         raise HTTPException(status_code=404, detail="Road not found")
@@ -214,44 +210,15 @@ def generate_sections(
 
     length_km = float(road.total_length_km) if road.total_length_km is not None else None
     if length_km is None or length_km <= 0:
-        geom_len_m = db.scalar(
-            select(
-                func.ST_Length(func.Geography(func.ST_Transform(Road.geometry, 4326)))
-            ).where(Road.road_id == road_id)
-        )
-        # ST_Length on geography returns meters; simpler path:
-        geom_len_m = db.scalar(
-            select(func.ST_Length(Road.geometry.cast(type_=None))).where(
-                Road.road_id == road_id
-            )
-        )
-        # Prefer geography length in meters
-        geom_len_m = db.execute(
-            select(
-                func.ST_Length(func.ST_Transform(Road.geometry, 4326), True)
-            ).where(Road.road_id == road_id)
+        length_m = db.execute(
+            text(
+                "SELECT ST_Length(geometry::geography) "
+                "FROM rams.roads WHERE road_id = :rid"
+            ),
+            {"rid": road_id},
         ).scalar()
-        if geom_len_m is None or float(geom_len_m) <= 0:
-            # Try geography cast style used by PostGIS
-            geom_len_m = db.execute(
-                select(
-                    func.ST_Length(
-                        func.CAST(Road.geometry, type_=None)
-                    )
-                ).where(Road.road_id == road_id)
-            ).scalar()
-
-        length_m_row = db.execute(
-            select(
-                func.ST_Length(
-                    func.Geography(
-                        func.ST_SetSRID(Road.geometry, 4326)
-                    )
-                )
-            ).where(Road.road_id == road_id)
-        ).scalar()
-        if length_m_row is not None and float(length_m_row) > 0:
-            length_km = float(length_m_row) / 1000.0
+        if length_m is not None and float(length_m) > 0:
+            length_km = float(length_m) / 1000.0
 
     if length_km is None or length_km <= 0:
         raise HTTPException(
@@ -264,37 +231,37 @@ def generate_sections(
             db.delete(sec)
         db.flush()
 
+    has_geometry = db.execute(
+        text(
+            "SELECT geometry IS NOT NULL FROM rams.roads WHERE road_id = :rid"
+        ),
+        {"rid": road_id},
+    ).scalar()
+
     section_km = float(payload.section_length_m) / 1000.0
     created = 0
     start = 0.0
     index = 1
-    has_geometry = (
-        db.scalar(
-            select(func.ST_AsText(Road.geometry)).where(Road.road_id == road_id)
-        )
-        is not None
-    )
 
     while start < length_km - 1e-9:
         end = min(start + section_km, length_km)
         code = f"{road.road_code}-S{index:03d}"
-        # avoid unique clashes if regenerating partial
         while db.scalar(select(RoadSection).where(RoadSection.section_code == code)):
             index += 1
             code = f"{road.road_code}-S{index:03d}"
 
         geometry = None
         if has_geometry and length_km > 0:
-            # fraction along linestring 0..1
-            f0 = start / length_km
-            f1 = end / length_km
-            geometry = func.ST_LineSubstring(Road.geometry, f0, f1)
-            # bind via subquery from this road
-            geometry = db.scalar(
-                select(func.ST_LineSubstring(Road.geometry, f0, f1)).where(
-                    Road.road_id == road_id
-                )
-            )
+            f0 = max(0.0, min(1.0, start / length_km))
+            f1 = max(0.0, min(1.0, end / length_km))
+            if f1 > f0:
+                geometry = db.execute(
+                    text(
+                        "SELECT ST_LineSubstring(geometry, :f0, :f1) "
+                        "FROM rams.roads WHERE road_id = :rid"
+                    ),
+                    {"f0": f0, "f1": f1, "rid": road_id},
+                ).scalar()
 
         section = RoadSection(
             road_id=road_id,
@@ -310,7 +277,6 @@ def generate_sections(
         index += 1
         start = end
 
-    # persist length if it was derived
     if road.total_length_km is None:
         road.total_length_km = round(length_km, 3)
 
