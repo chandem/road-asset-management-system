@@ -190,6 +190,33 @@ CREATE TABLE maintenance_activities (
     CHECK (actual_cost IS NULL OR actual_cost >= 0)
 );
 
+CREATE TABLE work_orders (
+    work_order_id BIGSERIAL PRIMARY KEY,
+    maintenance_id BIGINT NOT NULL REFERENCES maintenance_activities(maintenance_id) ON DELETE CASCADE,
+    order_number VARCHAR(100) NOT NULL UNIQUE,
+    issue_date DATE NOT NULL,
+    due_date DATE,
+    status VARCHAR(30) NOT NULL DEFAULT 'draft',
+    assigned_to VARCHAR(200),
+    instructions TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE work_order_history (
+    history_id BIGSERIAL PRIMARY KEY,
+    work_order_id BIGINT NOT NULL REFERENCES work_orders(work_order_id) ON DELETE CASCADE,
+    changed_by BIGINT REFERENCES users(user_id) ON DELETE SET NULL,
+    action VARCHAR(30) NOT NULL,
+    changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    old_values JSONB,
+    new_values JSONB
+);
+
+CREATE INDEX idx_work_orders_maintenance ON work_orders (maintenance_id);
+CREATE INDEX idx_work_orders_status ON work_orders (status);
+CREATE INDEX idx_work_order_history_work_order ON work_order_history (work_order_id, changed_at DESC);
+
 CREATE TABLE asset_inspections (
     asset_inspection_id BIGSERIAL PRIMARY KEY,
     asset_id BIGINT NOT NULL REFERENCES road_assets(asset_id) ON DELETE CASCADE,
