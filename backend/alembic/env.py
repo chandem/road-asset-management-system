@@ -17,7 +17,9 @@ database_url = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg://rams_user:change_me@localhost:5432/rams",
 )
-config.set_main_option("sqlalchemy.url", database_url)
+# Alembic uses ConfigParser internally, where "%" starts interpolation.
+# Escape percent signs so passwords containing "%" are accepted.
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 # SQLAlchemy models are not required for SQL-based migrations.
 target_metadata = None
