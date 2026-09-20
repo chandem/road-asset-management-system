@@ -33,7 +33,33 @@ async function request(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-export function getRoads() { return request("/roads"); }
+export function getRoads(params = {}) {
+  const q = new URLSearchParams();
+  if (params.q) q.set("q", params.q);
+  if (params.status) q.set("status", params.status);
+  if (params.class) q.set("class", params.class);
+  const qs = q.toString();
+  return request(`/roads${qs ? `?${qs}` : ""}`);
+}
+export function getRoad(roadId) { return request(`/roads/${roadId}`); }
+export function createRoad(payload) {
+  return request("/roads", { method: "POST", body: JSON.stringify(payload) });
+}
+export function updateRoad(roadId, payload) {
+  return request(`/roads/${roadId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+export function archiveRoad(roadId) {
+  return request(`/roads/${roadId}`, { method: "DELETE" });
+}
+export function generateRoadSections(roadId, payload = {}) {
+  return request(`/roads/${roadId}/generate-sections`, {
+    method: "POST",
+    body: JSON.stringify({
+      section_length_m: payload.section_length_m ?? 500,
+      replace_existing: Boolean(payload.replace_existing),
+    }),
+  });
+}
 export function getDashboardSummary() { return request("/dashboard/summary"); }
 export function getDashboardAttention() { return request("/dashboard/attention"); }
 export function getDashboardKPIs() { return request("/dashboard/kpis"); }
