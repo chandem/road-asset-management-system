@@ -1,17 +1,25 @@
-export default function SummaryCards({ loading, counts, roads, gpsGeoJSON, sectionGeoJSON, assetGeoJSON, defectGeoJSON }) {
-  const roadsN = counts?.roads ?? roads?.length ?? 0;
-  const gpsN = counts?.gps_tracks ?? gpsGeoJSON?.features?.length ?? 0;
-  const sectionsN = counts?.sections ?? sectionGeoJSON?.features?.length ?? 0;
-  const assetsN = counts?.assets ?? assetGeoJSON?.features?.length ?? 0;
-  const defectsN = counts?.defects ?? defectGeoJSON?.features?.length ?? 0;
+const ITEMS = [
+  { key: "roads", label: "Roads", fromCounts: "roads", fromList: (p) => p.roads?.length },
+  { key: "gps", label: "GPS Tracks", fromCounts: "gps_tracks", fromList: (p) => p.gpsGeoJSON?.features?.length },
+  { key: "sections", label: "Sections", fromCounts: "sections", fromList: (p) => p.sectionGeoJSON?.features?.length },
+  { key: "assets", label: "Assets", fromCounts: "assets", fromList: (p) => p.assetGeoJSON?.features?.length },
+  { key: "defects", label: "Defects", fromCounts: "defects", fromList: (p) => p.defectGeoJSON?.features?.length },
+];
+
+export default function SummaryCards(props) {
+  const { loading, counts } = props;
 
   return (
-    <section className="cards">
-      <div className="card"><span>Roads</span><strong>{loading ? "…" : roadsN}</strong></div>
-      <div className="card"><span>GPS Tracks</span><strong>{loading ? "…" : gpsN}</strong></div>
-      <div className="card"><span>Sections</span><strong>{loading ? "…" : sectionsN}</strong></div>
-      <div className="card"><span>Assets</span><strong>{loading ? "…" : assetsN}</strong></div>
-      <div className="card"><span>Defects</span><strong>{loading ? "…" : defectsN}</strong></div>
+    <section className="cards" aria-label="Portfolio summary">
+      {ITEMS.map((item) => {
+        const value = counts?.[item.fromCounts] ?? item.fromList(props) ?? 0;
+        return (
+          <div className="card" key={item.key}>
+            <span>{item.label}</span>
+            <strong aria-live="polite">{loading ? "…" : value}</strong>
+          </div>
+        );
+      })}
     </section>
   );
 }
