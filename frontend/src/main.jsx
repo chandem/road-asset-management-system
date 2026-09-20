@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./styles.css";
+import "./kpi.css";
 import AuthGate from "./AuthGate";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
