@@ -31,8 +31,10 @@ from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.inspection import Inspection
 from app.models.maintenance_activity import MaintenanceActivity
+from app.models.maintenance_plan import MaintenancePlan
 from app.models.organization import Organization
 from app.models.road import Road
+from app.models.road_asset import RoadAsset
 from app.models.road_defect import RoadDefect
 from app.models.road_section import RoadSection
 from app.models.user import User
