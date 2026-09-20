@@ -1,6 +1,6 @@
 """add work order execution tracking
 
-Revision ID: 0004
+Revision ID: 0004_work_order_execution
 Revises: 0003_offline_defects
 """
 
@@ -8,8 +8,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0004"
-down_revision = "0003"
+revision = "0004_work_order_execution"
+down_revision = "0003_offline_defects"
 branch_labels = None
 depends_on = None
 
