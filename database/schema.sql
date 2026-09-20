@@ -4,7 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
 
 CREATE SCHEMA IF NOT EXISTS rams;
-SET search_path TO rams, public;
+SET search_path TO rams, public, extensions;
 
 CREATE TABLE organizations (
     organization_id BIGSERIAL PRIMARY KEY,
