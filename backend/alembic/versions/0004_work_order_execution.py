@@ -15,10 +15,54 @@ depends_on = None
 
 
 def upgrade():
+    # Some existing RAMS databases contain the baseline road tables but are
+    # missing later core tables. Ensure the parent table exists before adding
+    # the execution foreign key.
+    op.execute(
+        """
+        CREATE TABLE IF NOT EXISTS rams.work_orders (
+            work_order_id BIGSERIAL PRIMARY KEY,
+            maintenance_id BIGINT NOT NULL
+                REFERENCES rams.maintenance_activities(maintenance_id)
+                ON DELETE CASCADE,
+            order_number VARCHAR(100) NOT NULL UNIQUE,
+            issue_date DATE NOT NULL,
+            due_date DATE,
+            status VARCHAR(30) NOT NULL DEFAULT 'draft',
+            assigned_to VARCHAR(200),
+            instructions TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """
+    )
+
+    op.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_work_orders_maintenance
+        ON rams.work_orders (maintenance_id)
+        """
+    )
+    op.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_work_orders_status
+        ON rams.work_orders (status)
+        """
+    )
+
     op.create_table(
         "work_order_executions",
         sa.Column("execution_id", sa.BigInteger(), primary_key=True),
-        sa.Column("work_order_id", sa.BigInteger(), sa.ForeignKey("rams.work_orders.work_order_id", ondelete="CASCADE"), nullable=False, unique=True),
+        sa.Column(
+            "work_order_id",
+            sa.BigInteger(),
+            sa.ForeignKey(
+                "rams.work_orders.work_order_id",
+                ondelete="CASCADE",
+            ),
+            nullable=False,
+            unique=True,
+        ),
         sa.Column("started_at", sa.DateTime(timezone=True)),
         sa.Column("completed_at", sa.DateTime(timezone=True)),
         sa.Column("crew", sa.Text()),
