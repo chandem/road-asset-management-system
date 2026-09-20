@@ -20,6 +20,7 @@ import InspectionDefectForm from "./components/InspectionDefectForm";
 import Reports from "./Reports";
 import WorkOrderManagement from "./WorkOrderManagement";
 import AssetRegister from "./AssetRegister";
+import RoadRegister from "./RoadRegister";
 import AuditHistory from "./AuditHistory";
 import MaintenancePlanning from "./MaintenancePlanning";
 import ConditionAssessment from "./ConditionAssessment";
@@ -28,9 +29,6 @@ import MaintenanceEffectiveness from "./MaintenanceEffectiveness";
 import MaintenanceDecisionSupport from "./MaintenanceDecisionSupport";
 import InspectionWorkflowPanel from "./InspectionWorkflowPanel";
 import { canAccessTab, filterNavGroups, normalizeRole } from "./roles";
-
-// NOTE: The rest of this file is unchanged from the current repository.
-// This update only replaces the report calculation below.
 
 function buildReport(summaryCounts, roads, sections, allMaintenance, inspections, defectGeoJSON) {
   const defects = defectGeoJSON?.features || [];
@@ -278,6 +276,7 @@ function App({ user }) {
         {activeTab === "overview" && <><SummaryCards loading={loading} counts={summaryCounts} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} /><KPIDashboard kpis={kpis} loading={loading} /><AttentionPanel attention={attention} loading={loading} onNavigate={setActiveTab} /><ReportPanel report={report} onRefresh={loadDashboard} /><RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} /></>}
         {activeTab === "map" && <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />}
         {activeTab === "field" && <><section className="action-panel"><h2>Field Data Entry</h2><p>Create inspections, defects and field photos.</p><div className="actions"><button type="button" onClick={() => openForm("inspection")}>+ New Inspection</button><button type="button" onClick={() => openForm("defect")}>+ New Defect</button></div></section><OfflineInspectionQueue sections={sections} /><OfflineDefectQueue sections={sections} /><OfflinePhotoQueue /><FieldGPS /><PhotoAIPanel photo={photo} updatePhoto={updatePhoto} submitPhoto={submitPhoto} captureGPS={captureGPS} saving={saving} uploadedImageId={uploadedImageId} aiResults={aiResults} aiRunning={aiRunning} detectPhoto={detectPhoto} loadExistingDetections={loadExistingDetections} aiStatus={aiStatus} aiMessage={aiMessage} /></>}
+        {activeTab === "roads" && <RoadRegister />}
         {activeTab === "maintenance" && <MaintenanceSection roads={roads} sections={sections} maintenanceRoadId={maintenanceRoadId} setMaintenanceRoadId={setMaintenanceRoadId} maintenance={maintenance} maintenanceLoading={maintenanceLoading} maintenanceForm={maintenanceForm} updateMaintenance={updateMaintenance} submitMaintenance={submitMaintenance} loadMaintenance={loadMaintenance} saving={saving} message={message} completedCount={completedCount} estimatedTotal={estimatedTotal} actualTotal={actualTotal} />}
         {activeTab === "planning" && <MaintenancePlanning />}
         {activeTab === "condition" && <ConditionAssessment />}
