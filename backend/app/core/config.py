@@ -19,5 +19,20 @@ class Settings:
         "localhost,127.0.0.1",
     )
 
+    # Object storage for field photos (see app.services.object_storage)
+    storage_backend = os.getenv("STORAGE_BACKEND", "local").strip().lower()
+    upload_dir = os.getenv("UPLOAD_DIR", "uploads/images")
+    s3_bucket = os.getenv("S3_BUCKET", "")
+    s3_endpoint_url = os.getenv("S3_ENDPOINT_URL", "")
+
+    # AI detection (see app.services.defect_detector)
+    ai_model_path = os.getenv("AI_MODEL_PATH", "models/road_defect.pt")
+    ai_stub_mode = os.getenv("AI_STUB_MODE", "false").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
 
 settings = Settings()
