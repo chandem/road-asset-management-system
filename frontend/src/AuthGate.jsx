@@ -61,8 +61,9 @@ export default function AuthGate() {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <h1>RAMS</h1>
-          <p>Checking session…</p>
+          <div className="auth-logo">RAMS</div>
+          <h1>Road Asset Management System</h1>
+          <p className="auth-subtitle">Restoring your session…</p>
         </div>
       </div>
     );
@@ -74,7 +75,7 @@ export default function AuthGate() {
         <form className="auth-card" onSubmit={handleLogin}>
           <div className="auth-logo">RAMS</div>
           <h1>Road Asset Management System</h1>
-          <p className="auth-subtitle">Sign in to continue</p>
+          <p className="auth-subtitle">Sign in to manage roads, assets, and field work</p>
           <label>
             Username
             <input
@@ -82,6 +83,7 @@ export default function AuthGate() {
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
               required
+              placeholder="admin"
             />
           </label>
           <label>
@@ -92,6 +94,7 @@ export default function AuthGate() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               required
+              placeholder="••••••••"
             />
           </label>
           {error && <div className="auth-error">{error}</div>}
