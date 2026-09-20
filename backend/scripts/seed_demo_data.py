@@ -22,6 +22,7 @@ Note: road_sections.length_km is GENERATED ALWAYS — do not set it on insert.
 """
 from __future__ import annotations
 
+import os
 from datetime import date
 
 from geoalchemy2.elements import WKTElement
@@ -45,6 +46,20 @@ DEMO_PASSWORD = "DemoPass123!"
 ROAD_A_LINE = "LINESTRING(38.75 9.00, 38.85 9.02, 38.95 9.05)"
 ROAD_B_LINE = "LINESTRING(38.70 8.95, 38.80 8.98, 38.90 9.00)"
 ROAD_C_LINE = "LINESTRING(38.78 9.03, 38.88 9.06, 38.98 9.08)"
+
+
+def validate_environment() -> None:
+    """Fail before opening a database session when required settings are absent."""
+    required = ("DATABASE_URL", "JWT_SECRET_KEY")
+    missing = [name for name in required if not os.getenv(name)]
+    if missing:
+        raise RuntimeError(
+            "Missing required environment variable(s): " + ", ".join(missing)
+        )
+
+    jwt_secret = os.environ["JWT_SECRET_KEY"]
+    if len(jwt_secret) < 32:
+        raise RuntimeError("JWT_SECRET_KEY must be at least 32 characters long")
 
 
 def get_or_create_organization(db) -> Organization:
@@ -118,8 +133,10 @@ def get_or_create_section(db, **kwargs) -> RoadSection:
 
 
 def main() -> None:
+    validate_environment()
     print("Seeding RAMS demo data…")
-    with SessionLocal() as db:
+    # Session.begin() commits on success and rolls back automatically on failure.
+    with SessionLocal.begin() as db:
         organization = get_or_create_organization(db)
         get_or_create_user(
             db,
@@ -186,7 +203,7 @@ def main() -> None:
             status="active",
         )
 
-        sec_a1 = get_or_create_section(
+        get_or_create_section(
             db,
             road_id=road_a.road_id,
             section_code="A001-S1",
@@ -281,8 +298,6 @@ def main() -> None:
             )
             db.add(maint)
             print("  + inspection, defect, and maintenance for A001-S2")
-
-        db.commit()
 
     print("Done.")
     print(f"Demo logins (password: {DEMO_PASSWORD}):")
