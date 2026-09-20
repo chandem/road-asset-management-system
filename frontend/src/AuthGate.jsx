@@ -109,13 +109,13 @@ export default function AuthGate() {
   return (
     <>
       <div className="auth-userbar">
-        <span>
+        <span className="auth-userbar-identity">
           Signed in as <strong>{user.full_name || user.username}</strong>
           {" · "}
           <span className="role-badge">{user.role}</span>
         </span>
-        <button type="button" onClick={logout}>
-          Logout
+        <button type="button" className="logout-button" onClick={logout}>
+          Log out
         </button>
       </div>
       <App user={user} />
