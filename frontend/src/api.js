@@ -48,8 +48,13 @@ export function createRoad(payload) {
 export function updateRoad(roadId, payload) {
   return request(`/roads/${roadId}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
+/** Soft-delete: status → archived */
 export function archiveRoad(roadId) {
   return request(`/roads/${roadId}`, { method: "DELETE" });
+}
+/** Hard-delete: remove road and CASCADE related rows from the database */
+export function deleteRoad(roadId) {
+  return request(`/roads/${roadId}?permanent=true`, { method: "DELETE" });
 }
 export function generateRoadSections(roadId, payload = {}) {
   return request(`/roads/${roadId}/generate-sections`, {
