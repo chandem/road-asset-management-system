@@ -31,6 +31,7 @@ from app.core.security import hash_password
 from app.db.session import SessionLocal
 from app.models.inspection import Inspection
 from app.models.maintenance_activity import MaintenanceActivity
+from app.models.organization import Organization
 from app.models.road import Road
 from app.models.road_defect import RoadDefect
 from app.models.road_section import RoadSection
@@ -44,11 +45,37 @@ ROAD_B_LINE = "LINESTRING(38.70 8.95, 38.80 8.98, 38.90 9.00)"
 ROAD_C_LINE = "LINESTRING(38.78 9.03, 38.88 9.06, 38.98 9.08)"
 
 
-def get_or_create_user(db, *, username: str, full_name: str, role: str, email: str) -> User:
+def get_or_create_organization(db) -> Organization:
+    organization = db.scalar(
+        select(Organization).where(Organization.code == "RAMS-DEMO")
+    )
+    if organization is not None:
+        return organization
+
+    organization = Organization(name="RAMS Demo Organization", code="RAMS-DEMO")
+    db.add(organization)
+    db.flush()
+    print("  + organization RAMS-DEMO")
+    return organization
+
+
+def get_or_create_user(
+    db,
+    *,
+    organization_id: int,
+    username: str,
+    full_name: str,
+    role: str,
+    email: str,
+) -> User:
     user = db.scalar(select(User).where(User.username == username))
     if user is not None:
+        if user.organization_id is None:
+            user.organization_id = organization_id
+            db.flush()
         return user
     user = User(
+        organization_id=organization_id,
         username=username,
         full_name=full_name,
         email=email,
@@ -91,8 +118,10 @@ def get_or_create_section(db, **kwargs) -> RoadSection:
 def main() -> None:
     print("Seeding RAMS demo data…")
     with SessionLocal() as db:
+        organization = get_or_create_organization(db)
         get_or_create_user(
             db,
+            organization_id=organization.organization_id,
             username="admin",
             full_name="RAMS Administrator",
             role="admin",
@@ -100,6 +129,7 @@ def main() -> None:
         )
         inspector = get_or_create_user(
             db,
+            organization_id=organization.organization_id,
             username="inspector",
             full_name="Field Inspector",
             role="inspector",
@@ -107,6 +137,7 @@ def main() -> None:
         )
         get_or_create_user(
             db,
+            organization_id=organization.organization_id,
             username="engineer",
             full_name="Road Engineer",
             role="engineer",
@@ -115,6 +146,7 @@ def main() -> None:
 
         road_a = get_or_create_road(
             db,
+            organization_id=organization.organization_id,
             road_code="A001",
             road_name="Addis–Bishoftu Corridor",
             road_class="primary",
@@ -127,6 +159,7 @@ def main() -> None:
         )
         road_b = get_or_create_road(
             db,
+            organization_id=organization.organization_id,
             road_code="A002",
             road_name="Ring Road Segment West",
             road_class="secondary",
@@ -139,6 +172,7 @@ def main() -> None:
         )
         road_c = get_or_create_road(
             db,
+            organization_id=organization.organization_id,
             road_code="A003",
             road_name="Bole–Airport Link",
             road_class="primary",
