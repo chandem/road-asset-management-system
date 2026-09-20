@@ -1,6 +1,6 @@
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
@@ -172,16 +172,52 @@ def update_road(
     return road
 
 
-@router.delete("/{road_id}", response_model=RoadResponse)
-def archive_road(road_id: int, db: DbSession, current_user: EngineerUser):
-    """Soft-delete: set status to archived (keeps history and sections)."""
+@router.delete(
+    "/{road_id}",
+    response_model=None,
+    responses={
+        200: {"model": RoadResponse, "description": "Road archived (soft delete)"},
+        204: {"description": "Road permanently deleted"},
+    },
+)
+def delete_road(
+    road_id: int,
+    db: DbSession,
+    current_user: EngineerUser,
+    permanent: bool = Query(
+        default=False,
+        description="If true, permanently delete the road and related rows (CASCADE). "
+        "If false, archive only (status=archived).",
+    ),
+):
     road = db.get(Road, road_id)
     if road is None:
         raise HTTPException(status_code=404, detail="Road not found")
-    road.status = "archived"
-    db.commit()
-    db.refresh(road)
-    return road
+
+    if not permanent:
+        road.status = "archived"
+        db.commit()
+        db.refresh(road)
+        return road
+
+    # Permanent remove. FK CASCADE on sections / related tables where defined.
+    try:
+        db.execute(
+            text("DELETE FROM rams.roads WHERE road_id = :rid"),
+            {"rid": road_id},
+        )
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Could not permanently delete road: {exc}. "
+                "Related records may block delete; archive instead or clear dependencies."
+            ),
+        ) from exc
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
@@ -269,7 +305,6 @@ def generate_sections(
     start = 0.0
     index = 1
     surface = road.surface_type
-    # section_code is VARCHAR(50) in schema
     base_code = (road.road_code or f"R{road_id}")[:40]
 
     try:
