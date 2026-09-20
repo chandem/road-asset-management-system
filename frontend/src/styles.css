@@ -46,7 +46,6 @@ body {
   background-attachment: fixed;
 }
 
-/* Soft mesh overlay for depth without noise images */
 body::before {
   content: "";
   position: fixed;
@@ -135,28 +134,28 @@ label > input, label > select, label > textarea { margin-top: 0.4rem; }
   justify-content: center;
   gap: 0.4rem;
   min-height: 36px;
-  padding: 0.4rem 1rem;
+  padding: 0.4rem 1.05rem;
   border-radius: 999px;
-  border: 1px solid rgba(248, 113, 113, 0.55);
-  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
+  border: 1px solid rgba(125, 211, 252, 0.45);
+  background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 100%);
   color: #fff !important;
   font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
 .logout-button:hover,
 .auth-userbar .logout-button:hover {
-  background: linear-gradient(180deg, #f87171 0%, #ef4444 100%) !important;
-  border-color: #fca5a5;
-  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.45);
+  background: linear-gradient(180deg, #38bdf8 0%, #0ea5e9 100%) !important;
+  border-color: #7dd3fc;
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.45);
 }
 .logout-button:active,
 .auth-userbar .logout-button:active { transform: translateY(1px); }
 .logout-button:focus-visible {
-  outline: 3px solid rgba(248, 113, 113, 0.45);
+  outline: 3px solid rgba(56, 189, 248, 0.5);
   outline-offset: 2px;
 }
 
@@ -301,7 +300,6 @@ select { appearance: none; padding-right: 2.5rem; background-image: linear-gradi
 .filter-bar button { flex: 0 0 auto; }
 button:disabled { opacity: .6; cursor: not-allowed; }
 
-/* —— Feedback / dialogue messages —— */
 .form-message,
 .message-success {
   display: flex;
