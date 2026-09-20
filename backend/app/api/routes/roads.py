@@ -194,7 +194,10 @@ def generate_sections(
     db: DbSession,
     current_user: EngineerUser,
 ):
-    """Split a road into fixed-length sections (default 500 m)."""
+    """Split a road into fixed-length sections (default 500 m).
+
+    Note: rams.road_sections.length_km is GENERATED ALWAYS — do not INSERT it.
+    """
     road = db.get(Road, road_id)
     if road is None:
         raise HTTPException(status_code=404, detail="Road not found")
@@ -266,12 +269,13 @@ def generate_sections(
     start = 0.0
     index = 1
     surface = road.surface_type
+    # section_code is VARCHAR(50) in schema
+    base_code = (road.road_code or f"R{road_id}")[:40]
 
     try:
         while start < length_km - 1e-9:
             end = min(start + section_km, length_km)
-            code = f"{road.road_code}-S{index:03d}"
-            # ensure unique section_code
+            code = f"{base_code}-S{index:03d}"
             while db.execute(
                 text(
                     "SELECT 1 FROM rams.road_sections WHERE section_code = :code LIMIT 1"
@@ -279,7 +283,7 @@ def generate_sections(
                 {"code": code},
             ).first():
                 index += 1
-                code = f"{road.road_code}-S{index:03d}"
+                code = f"{base_code}-S{index:03d}"
 
             if has_geometry:
                 f0 = max(0.0, min(1.0, start / length_km))
@@ -291,14 +295,13 @@ def generate_sections(
                         """
                         INSERT INTO rams.road_sections (
                             road_id, section_code, start_chainage, end_chainage,
-                            length_km, surface_type, geometry
+                            surface_type, geometry
                         )
                         SELECT
                             :rid,
                             :code,
                             :start_ch,
                             :end_ch,
-                            :len_km,
                             :surface,
                             ST_LineSubstring(geometry, :f0, :f1)
                         FROM rams.roads
@@ -310,7 +313,6 @@ def generate_sections(
                         "code": code,
                         "start_ch": round(start, 3),
                         "end_ch": round(end, 3),
-                        "len_km": round(end - start, 3),
                         "surface": surface,
                         "f0": f0,
                         "f1": f1,
@@ -322,9 +324,9 @@ def generate_sections(
                         """
                         INSERT INTO rams.road_sections (
                             road_id, section_code, start_chainage, end_chainage,
-                            length_km, surface_type
+                            surface_type
                         ) VALUES (
-                            :rid, :code, :start_ch, :end_ch, :len_km, :surface
+                            :rid, :code, :start_ch, :end_ch, :surface
                         )
                         """
                     ),
@@ -333,7 +335,6 @@ def generate_sections(
                         "code": code,
                         "start_ch": round(start, 3),
                         "end_ch": round(end, 3),
-                        "len_km": round(end - start, 3),
                         "surface": surface,
                     },
                 )
