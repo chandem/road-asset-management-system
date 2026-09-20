@@ -129,18 +129,21 @@ def create_section(
         raise HTTPException(status_code=404, detail="Road not found")
 
     if payload.end_chainage <= payload.start_chainage:
-        raise HTTPException(status_code=400, detail="end_chainage must be greater than start_chainage")
+        raise HTTPException(
+            status_code=400,
+            detail="end_chainage must be greater than start_chainage",
+        )
 
     geometry = None
     if payload.geometry_wkt:
         geometry = func.ST_GeomFromText(payload.geometry_wkt, 4326)
 
+    # length_km is GENERATED ALWAYS in the database — do not set it
     section = RoadSection(
         road_id=road_id,
         section_code=payload.section_code,
         start_chainage=payload.start_chainage,
         end_chainage=payload.end_chainage,
-        length_km=payload.length_km,
         surface_type=payload.surface_type,
         condition_rating=payload.condition_rating,
         geometry=geometry,
@@ -149,9 +152,12 @@ def create_section(
     db.add(section)
     try:
         db.commit()
-    except Exception:
+    except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=400, detail="Could not create road section")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Could not create road section: {exc}",
+        ) from exc
 
     db.refresh(section)
     return section
