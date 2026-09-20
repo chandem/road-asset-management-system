@@ -7,6 +7,7 @@ import {
   getRoads,
   updateRoad,
 } from "./api";
+import RoadGeometryDrawer from "./RoadGeometryDrawer";
 
 const EMPTY_FORM = {
   road_code: "",
@@ -53,6 +54,21 @@ const selectedRoadStyles = `
   .road-register .selected-action {
     background: #d8bf82 !important; color: #2d2418 !important; border-color: #b68d45 !important; font-weight: 800;
   }
+  .road-draw-panel {
+    margin: 1rem 0 1.25rem; padding: 1rem;
+    border: 1px solid #e2e8f0; border-radius: 14px; background: #f8fafc;
+  }
+  .road-draw-toolbar, .road-draw-stats {
+    display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;
+  }
+  .road-draw-stats span { font-size: 0.9rem; color: #475569; }
+  .road-draw-stats .draw-mode-on { color: #0369a1; font-weight: 700; }
+  .road-draw-stats .draw-mode-off { color: #64748b; }
+  .road-draw-map {
+    border-radius: 12px; overflow: hidden; border: 1px solid #cbd5e1;
+    margin-bottom: 0.75rem;
+  }
+  .road-draw-wkt textarea { font-family: ui-monospace, monospace; font-size: 0.8rem; }
 `;
 
 export default function RoadRegister() {
@@ -69,6 +85,7 @@ export default function RoadRegister() {
   const [sections, setSections] = useState([]);
   const [sectionsLoading, setSectionsLoading] = useState(false);
   const [sectionLengthM, setSectionLengthM] = useState(500);
+  const [showDrawer, setShowDrawer] = useState(false);
 
   const loadRoads = useCallback(async () => {
     setLoading(true);
@@ -113,6 +130,7 @@ export default function RoadRegister() {
     setForm(EMPTY_FORM);
     setMessage("");
     setError("");
+    setShowDrawer(false);
   }
 
   function startEdit(road) {
@@ -131,7 +149,23 @@ export default function RoadRegister() {
     });
     setMessage("");
     setError("");
+    setShowDrawer(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function applyDrawnGeometry({ geometry_wkt, total_length_km }) {
+    setForm((prev) => ({
+      ...prev,
+      geometry_wkt: geometry_wkt || prev.geometry_wkt,
+      total_length_km:
+        total_length_km != null && total_length_km > 0
+          ? String(total_length_km)
+          : prev.total_length_km,
+    }));
+    setShowDrawer(false);
+    setMessage(
+      `Geometry applied (${total_length_km} km estimated). Save the road to store it in the database.`,
+    );
   }
 
   async function handleSubmit(e) {
@@ -161,6 +195,7 @@ export default function RoadRegister() {
       }
       setEditingId(null);
       setForm(EMPTY_FORM);
+      setShowDrawer(false);
       await loadRoads();
     } catch (err) {
       setError(err.message || String(err));
@@ -226,8 +261,8 @@ export default function RoadRegister() {
         <div>
           <h2>Road register</h2>
           <p>
-            Add, edit, and archive roads. Optional WKT geometry and automatic section
-            generation (default 500 m) save to the RAMS PostgreSQL/PostGIS database.
+            Add, edit, and archive roads. Draw geometry on the map or paste WKT.
+            Automatic section generation (default 500 m) saves to PostgreSQL/PostGIS.
           </p>
         </div>
         <button type="button" onClick={startCreate}>+ Add road</button>
@@ -307,13 +342,28 @@ export default function RoadRegister() {
             </select>
           </label>
         </div>
+
+        <div className="actions" style={{ marginBottom: "0.75rem" }}>
+          <button type="button" onClick={() => setShowDrawer((v) => !v)}>
+            {showDrawer ? "Hide map drawer" : "📍 Draw geometry on map"}
+          </button>
+        </div>
+
+        {showDrawer && (
+          <RoadGeometryDrawer
+            onApply={applyDrawnGeometry}
+            onCancel={() => setShowDrawer(false)}
+            title="Draw road centerline"
+          />
+        )}
+
         <label>
           Geometry (WKT LINESTRING, optional)
           <textarea
             rows={3}
             value={form.geometry_wkt}
             onChange={(e) => updateField("geometry_wkt", e.target.value)}
-            placeholder="LINESTRING(38.7 9.0, 38.8 9.1)"
+            placeholder="LINESTRING(38.7 9.0, 38.8 9.1) — or use Draw geometry on map"
           />
         </label>
         <div className="actions">
@@ -356,8 +406,8 @@ export default function RoadRegister() {
 
       <div className="selected-road-banner" aria-live="polite">
         {selectedId
-          ? `Selected road: #${selectedId} — highlighted in a softer blue with a muted gold accent.`
-          : "No road selected — click anywhere on a road row to select it."}
+          ? `Selected road: #${selectedId}`
+          : "No road selected — click a road row to view sections."}
       </div>
 
       <div className="table-wrap">
