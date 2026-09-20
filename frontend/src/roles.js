@@ -5,6 +5,7 @@ export const TAB_ROLES = {
   map: ["admin", "engineer", "inspector", "field_staff"],
   field: ["admin", "engineer", "inspector", "field_staff"],
   workflow: ["admin", "engineer", "inspector", "field_staff"],
+  roads: ["admin", "engineer"],
   maintenance: ["admin", "engineer"],
   planning: ["admin", "engineer"],
   workorders: ["admin", "engineer"],
@@ -38,6 +39,7 @@ export const ALL_NAV_GROUPS = [
     id: "operations",
     label: "Operations",
     tabs: [
+      { id: "roads", label: "Roads" },
       { id: "maintenance", label: "Activities" },
       { id: "planning", label: "Planning" },
       { id: "workorders", label: "Work orders" },
