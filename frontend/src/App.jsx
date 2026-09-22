@@ -326,7 +326,7 @@ export default function App({ authUser, user, onLogout }) {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
+        <div className="topbar-brand">
           <h1>Road Asset Management System</h1>
           <p>Network condition, maintenance, and field operations</p>
         </div>
@@ -334,21 +334,26 @@ export default function App({ authUser, user, onLogout }) {
           <span className={`connectivity ${navigator.onLine ? "online" : "offline"}`}>
             {navigator.onLine ? "Online" : "Offline"}
           </span>
-          {sessionUser?.username && (
-            <span className="role-status">{sessionUser.username}</span>
-          )}
+          <div className="topbar-user">
+            <div className="topbar-user-meta">
+              <span className="topbar-user-label">Signed in</span>
+              <strong className="topbar-user-name">
+                {sessionUser?.full_name || sessionUser?.username || "User"}
+              </strong>
+              {sessionUser?.role && (
+                <span className="role-badge">{sessionUser.role}</span>
+              )}
+            </div>
+            <button
+              type="button"
+              className="logout-button"
+              onClick={() => onLogout?.()}
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </header>
-
-      <div className="auth-userbar">
-        <div className="auth-userbar-identity">
-          Signed in as <strong>{sessionUser?.full_name || sessionUser?.username || "User"}</strong>
-          {sessionUser?.role && <span className="role-badge">{sessionUser.role}</span>}
-        </div>
-        <button type="button" className="logout-button" onClick={() => onLogout?.()}>
-          Log out
-        </button>
-      </div>
 
       <nav className="app-nav">
         <div className="nav-groups" role="tablist" aria-label="Sections">
