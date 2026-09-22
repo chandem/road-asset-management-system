@@ -6,6 +6,52 @@ function money(value) {
   return `${(Number(value) || 0).toLocaleString()} ETB`;
 }
 
+const STATUS_META = {
+  planned: { label: "Planned", tone: "planned", icon: "○" },
+  "in progress": { label: "In progress", tone: "progress", icon: "◐" },
+  completed: { label: "Completed", tone: "completed", icon: "✓" },
+  cancelled: { label: "Cancelled", tone: "cancelled", icon: "×" },
+  other: { label: "Other", tone: "other", icon: "•" },
+};
+
+const PRIORITY_META = {
+  low: { label: "Low", tone: "low", icon: "↓" },
+  medium: { label: "Medium", tone: "medium", icon: "→" },
+  high: { label: "High", tone: "high", icon: "↑" },
+  critical: { label: "Critical", tone: "critical", icon: "!" },
+  other: { label: "Other", tone: "other", icon: "•" },
+};
+
+function CountRow({ name, value, metadata }) {
+  const meta = metadata[name] || { label: name, tone: "other", icon: "•" };
+  return (
+    <div className="analytics-count-row">
+      <span className={`analytics-count-icon ${meta.tone}`} aria-hidden="true">{meta.icon}</span>
+      <span className="analytics-count-label">{meta.label}</span>
+      <strong className={`analytics-count-badge ${meta.tone}`}>{value.toLocaleString()}</strong>
+    </div>
+  );
+}
+
+function CountCard({ title, values, metadata }) {
+  const entries = Object.entries(values).filter(([key, value]) => key !== "other" || value);
+  return (
+    <div className="report-box analytics-count-card">
+      <div className="analytics-count-card-heading">
+        <h3>{title}</h3>
+        <span className="analytics-count-total">
+          {Object.values(values).reduce((sum, value) => sum + value, 0).toLocaleString()} total
+        </span>
+      </div>
+      <div className="analytics-count-list">
+        {entries.map(([key, value]) => (
+          <CountRow key={key} name={key} value={value} metadata={metadata} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function MaintenanceAnalytics() {
   const [roads, setRoads] = useState([]);
   const [maintenance, setMaintenance] = useState([]);
@@ -89,18 +135,8 @@ export default function MaintenanceAnalytics() {
       </div>
 
       <div className="report-grid">
-        <div className="report-box">
-          <h3>Status</h3>
-          {Object.entries(report.status).filter(([key]) => key !== "other" || report.status.other).map(([key, value]) => (
-            <div className="analytics-row" key={key}><span>{key}</span><strong>{value}</strong></div>
-          ))}
-        </div>
-        <div className="report-box">
-          <h3>Priority</h3>
-          {Object.entries(report.priority).filter(([key]) => key !== "other" || report.priority.other).map(([key, value]) => (
-            <div className="analytics-row" key={key}><span>{key}</span><strong>{value}</strong></div>
-          ))}
-        </div>
+        <CountCard title="Status" values={report.status} metadata={STATUS_META} />
+        <CountCard title="Priority" values={report.priority} metadata={PRIORITY_META} />
         <div className="report-box analytics-wide">
           <h3>Maintenance by Activity Type</h3>
           {Object.entries(report.byType).length === 0 && <p>No maintenance activities recorded.</p>}
