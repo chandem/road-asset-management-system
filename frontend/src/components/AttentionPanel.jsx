@@ -1,55 +1,70 @@
 export default function AttentionPanel({ attention, loading, onNavigate }) {
-  if (loading && !attention) {
+  const normalizedAttention = attention || { totals: {}, overdue_work_orders: [], high_severity_defects: [], overdue_maintenance: [], over_budget_plans: [] };
+  const totals = normalizedAttention.totals || {};
+
+  const safeNumber = (value) => Number(value) || 0;
+  const total =
+    safeNumber(totals.overdue_work_orders) +
+    safeNumber(totals.high_severity_defects) +
+    safeNumber(totals.overdue_maintenance) +
+    safeNumber(totals.over_budget_plans);
+
+  const severityCounts = [
+    { key: "overdue_work_orders", label: "overdue WOs", tone: "warn" },
+    { key: "high_severity_defects", label: "high defects", tone: "danger" },
+    { key: "overdue_maintenance", label: "overdue maint.", tone: "warn" },
+    { key: "over_budget_plans", label: "over budget", tone: "danger" },
+  ];
+
+  if (loading && !normalizedAttention?.totals) {
     return (
-      <section className="attention-panel">
+      <section className="attention-panel" aria-live="polite" aria-busy="true">
         <div className="panel-heading">
-          <h2>Needs attention</h2>
-          <p>Loading operational alerts…</p>
+          <div>
+            <h2>Needs attention</h2>
+            <p>Loading operational alerts…</p>
+          </div>
         </div>
       </section>
     );
   }
 
-  const totals = attention?.totals || {};
-  const total =
-    (totals.overdue_work_orders || 0) +
-    (totals.high_severity_defects || 0) +
-    (totals.overdue_maintenance || 0) +
-    (totals.over_budget_plans || 0);
-
   if (!loading && total === 0) {
     return (
-      <section className="attention-panel attention-ok">
+      <section className="attention-panel attention-ok" aria-live="polite">
         <div className="panel-heading">
-          <h2>Needs attention</h2>
-          <p>No overdue work orders, high-severity defects, or over-budget plans right now.</p>
+          <div>
+            <h2>Needs attention</h2>
+            <p>No overdue work orders, high-severity defects, or over-budget plans right now.</p>
+          </div>
         </div>
       </section>
     );
   }
 
   return (
-    <section className="attention-panel">
+    <section className="attention-panel" aria-label="Operational alerts summary">
       <div className="panel-heading">
         <div>
           <h2>Needs attention</h2>
-          <p>
-            {total} item{total === 1 ? "" : "s"} as of {attention?.as_of || "—"}
+          <p aria-live="polite">
+            {total} item{total === 1 ? "" : "s"} as of {normalizedAttention.as_of || "—"}
           </p>
         </div>
-        <div className="attention-pills">
-          <span className="pill warn">{totals.overdue_work_orders || 0} overdue WOs</span>
-          <span className="pill danger">{totals.high_severity_defects || 0} high defects</span>
-          <span className="pill warn">{totals.overdue_maintenance || 0} overdue maint.</span>
-          <span className="pill danger">{totals.over_budget_plans || 0} over budget</span>
+        <div className="attention-pills" aria-label="Operational alert totals">
+          {severityCounts.map(({ key, label, tone }) => (
+            <span key={key} className={`pill ${tone}`}>
+              {safeNumber(totals[key])} {label}
+            </span>
+          ))}
         </div>
       </div>
 
       <div className="attention-grid">
         <AttentionColumn
           title="Overdue work orders"
-          empty="None"
-          items={attention?.overdue_work_orders}
+          empty="No overdue work orders"
+          items={normalizedAttention.overdue_work_orders}
           render={(wo) => (
             <>
               <strong>{wo.order_number}</strong>
@@ -61,8 +76,8 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
         />
         <AttentionColumn
           title="High-severity defects"
-          empty="None"
-          items={attention?.high_severity_defects}
+          empty="No high-severity defects"
+          items={normalizedAttention.high_severity_defects}
           render={(d) => (
             <>
               <strong>{d.defect_type}</strong>
@@ -74,8 +89,8 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
         />
         <AttentionColumn
           title="Overdue maintenance"
-          empty="None"
-          items={attention?.overdue_maintenance}
+          empty="No overdue maintenance"
+          items={normalizedAttention.overdue_maintenance}
           render={(m) => (
             <>
               <strong>{m.activity_type}</strong>
@@ -87,8 +102,8 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
         />
         <AttentionColumn
           title="Plans over budget"
-          empty="None"
-          items={attention?.over_budget_plans}
+          empty="No over-budget plans"
+          items={normalizedAttention.over_budget_plans}
           render={(p) => (
             <>
               <strong>
@@ -108,7 +123,8 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
 }
 
 function AttentionColumn({ title, empty, items, render, onOpen }) {
-  const list = items || [];
+  const list = Array.isArray(items) ? items : [];
+
   return (
     <div className="attention-col">
       <div className="attention-col-head">
@@ -119,12 +135,13 @@ function AttentionColumn({ title, empty, items, render, onOpen }) {
           </button>
         )}
       </div>
+
       {list.length === 0 ? (
         <p className="muted">{empty}</p>
       ) : (
         <ul>
-          {list.slice(0, 8).map((item, i) => (
-            <li key={item.work_order_id || item.defect_id || item.maintenance_id || item.plan_id || i}>
+          {list.slice(0, 8).map((item, index) => (
+            <li key={item.work_order_id || item.defect_id || item.maintenance_id || item.plan_id || index}>
               {render(item)}
             </li>
           ))}
