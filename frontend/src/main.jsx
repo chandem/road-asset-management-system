@@ -4,6 +4,7 @@ import "./styles.css";
 import "./kpi.css";
 import "./offline-ui.css";
 import "./enhanced-ui.css";
+import "./auth-ui.css";
 import AuthGate from "./AuthGate";
 import ErrorBoundary from "./components/ErrorBoundary";
 
