@@ -3,7 +3,9 @@ import ReactDOM from "react-dom/client";
 import "./styles.css";
 import "./kpi.css";
 import "./offline-ui.css";
+import "./enhanced-ui.css";
 import AuthGate from "./AuthGate";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
@@ -15,6 +17,8 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AuthGate />
+    <ErrorBoundary>
+      <AuthGate />
+    </ErrorBoundary>
   </React.StrictMode>,
 );
