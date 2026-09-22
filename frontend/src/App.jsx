@@ -44,6 +44,26 @@ function buildReport(summaryCounts, roads, sections, allMaintenance, inspections
     types[type] = (types[type] || 0) + 1;
   }
 
+  const sectionValues = (sections || [])
+    .map((section) => Number(section?.condition_index ?? section?.condition_rating))
+    .filter((n) => Number.isFinite(n));
+  const averageCondition = sectionValues.length
+    ? sectionValues.reduce((a, b) => a + b, 0) / sectionValues.length
+    : null;
+
+  const planned = (allMaintenance || []).length;
+  const completed = (allMaintenance || []).filter(
+    (m) => String(m?.status || "").toLowerCase() === "completed",
+  ).length;
+  const estimated = (allMaintenance || []).reduce(
+    (sum, m) => sum + (Number(m?.estimated_cost) || 0),
+    0,
+  );
+  const actual = (allMaintenance || []).reduce(
+    (sum, m) => sum + (Number(m?.actual_cost) || 0),
+    0,
+  );
+
   const roadCondition = (roads || []).map((road) => {
     const roadSections = (sections || []).filter((section) => {
       const roadId = section?.road_id ?? section?.roadId;
@@ -54,33 +74,33 @@ function buildReport(summaryCounts, roads, sections, allMaintenance, inspections
       .filter((n) => Number.isFinite(n));
     const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
     return {
-      road_code: road?.road_code,
-      name: road?.name,
-      sections: roadSections.length,
-      avg_condition: avg == null ? null : Number(avg.toFixed(1)),
+      road_id: road?.road_id,
+      road_code: road?.road_code || "—",
+      road_name: road?.road_name || road?.name || "—",
+      sectionCount: roadSections.length,
+      condition: avg,
+      total_length_km: road?.total_length_km ?? null,
+      status: road?.status || "—",
     };
   });
 
   return {
-    generated_at: new Date().toISOString(),
-    counts: summaryCounts || {
-      roads: roads?.length || 0,
-      sections: sections?.length || 0,
-      defects: defects.length,
-    },
+    averageCondition,
+    inspectionCount: Array.isArray(inspections) ? inspections.length : Number(inspections) || 0,
+    defects: defects.length,
+    planned,
+    completed,
+    estimated,
+    actual,
     severity,
     types,
     roadCondition,
-    maintenance: {
-      total: (allMaintenance || []).length,
-      completed: (allMaintenance || []).filter((m) => String(m?.status || "").toLowerCase() === "completed").length,
-    },
-    inspections: (inspections || []).length,
   };
 }
 
-export default function App({ authUser, onLogout }) {
-  const role = normalizeRole(authUser?.role);
+export default function App({ authUser, user, onLogout }) {
+  const sessionUser = authUser || user || null;
+  const role = normalizeRole(sessionUser?.role);
   const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -314,18 +334,18 @@ export default function App({ authUser, onLogout }) {
           <span className={`connectivity ${navigator.onLine ? "online" : "offline"}`}>
             {navigator.onLine ? "Online" : "Offline"}
           </span>
-          {authUser?.username && (
-            <span className="role-status">{authUser.username}</span>
+          {sessionUser?.username && (
+            <span className="role-status">{sessionUser.username}</span>
           )}
         </div>
       </header>
 
       <div className="auth-userbar">
         <div className="auth-userbar-identity">
-          Signed in as <strong>{authUser?.full_name || authUser?.username || "User"}</strong>
-          {authUser?.role && <span className="role-badge">{authUser.role}</span>}
+          Signed in as <strong>{sessionUser?.full_name || sessionUser?.username || "User"}</strong>
+          {sessionUser?.role && <span className="role-badge">{sessionUser.role}</span>}
         </div>
-        <button type="button" className="logout-button" onClick={onLogout}>
+        <button type="button" className="logout-button" onClick={() => onLogout?.()}>
           Log out
         </button>
       </div>
