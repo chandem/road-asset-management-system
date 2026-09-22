@@ -147,7 +147,7 @@ body {
   color: #fde68a;
 }
 
-/* Dark nav */
+/* Dark nav — clear selected state on touch */
 .app-nav {
   display: flex;
   flex-direction: column;
@@ -161,30 +161,47 @@ body {
 }
 .nav-groups, .nav-tabs { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 .nav-group, .nav-tab {
-  border: 1.5px solid rgba(148,163,184,0.35);
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  border: 1.5px solid rgba(148,163,184,0.4);
   background: transparent;
   color: #94a3b8;
-  padding: 0.45rem 0.95rem;
+  padding: 0.5rem 1rem;
   border-radius: 12px;
   font-weight: 800;
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
-.nav-group.active {
-  background: #f8fafc;
-  color: #0f172a;
-  border-color: #f8fafc;
-}
-.nav-tab.active {
-  background: #0ea5e9;
-  color: #fff;
-  border-color: #0ea5e9;
-}
-.nav-group:hover, .nav-tab:hover {
+.nav-group:hover:not(.active),
+.nav-tab:hover:not(.active) {
   color: #e2e8f0;
-  border-color: rgba(148,163,184,0.55);
+  border-color: rgba(148,163,184,0.7);
+  background: rgba(255,255,255,0.06);
+}
+.nav-group:active:not(.active),
+.nav-tab:active:not(.active) {
+  background: rgba(255,255,255,0.1);
+  color: #f8fafc;
+}
+.nav-group.active,
+.nav-group.active:hover,
+.nav-group.active:focus {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #f8fafc !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.25);
+}
+.nav-tab.active,
+.nav-tab.active:hover,
+.nav-tab.active:focus {
+  background: #0ea5e9 !important;
+  color: #fff !important;
+  border-color: #0ea5e9 !important;
+  box-shadow: 0 2px 10px rgba(14, 165, 233, 0.4);
 }
 
 .dashboard { padding: 1.35rem 1.25rem 2rem; flex: 1; }

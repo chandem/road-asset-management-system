@@ -367,7 +367,8 @@ export default function App({ authUser, user, onLogout }) {
               aria-selected={activeGroup.id === group.id}
               className={`nav-group${activeGroup.id === group.id ? " active" : ""}`}
               onClick={() => {
-                if (activeGroup.id !== group.id) setActiveTab(group.tabs[0].id);
+                const first = group.tabs?.[0]?.id;
+                if (first) setActiveTab(first);
               }}
             >
               {group.label}
