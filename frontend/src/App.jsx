@@ -325,33 +325,35 @@ export default function App({ authUser, user, onLogout }) {
 
   return (
     <div className="app-shell">
+      <div className="auth-userbar">
+        <div className="auth-userbar-identity">
+          Signed in as{" "}
+          <strong>{sessionUser?.full_name || sessionUser?.username || "User"}</strong>
+          {sessionUser?.role ? (
+            <>
+              {" · "}
+              <span className="role-badge">{String(sessionUser.role).toUpperCase()}</span>
+            </>
+          ) : null}
+        </div>
+        <button type="button" className="logout-button" onClick={() => onLogout?.()}>
+          Logout
+        </button>
+      </div>
+
       <header className="topbar">
         <div className="topbar-brand">
           <h1>Road Asset Management System</h1>
-          <p>Network condition, maintenance, and field operations</p>
+          <p>RAMS · Road infrastructure management dashboard</p>
         </div>
         <div className="topbar-status">
           <span className={`connectivity ${navigator.onLine ? "online" : "offline"}`}>
-            {navigator.onLine ? "Online" : "Offline"}
+            {navigator.onLine ? "● Online" : "○ Offline"}
           </span>
-          <div className="topbar-user">
-            <div className="topbar-user-meta">
-              <span className="topbar-user-label">Signed in</span>
-              <strong className="topbar-user-name">
-                {sessionUser?.full_name || sessionUser?.username || "User"}
-              </strong>
-              {sessionUser?.role && (
-                <span className="role-badge">{sessionUser.role}</span>
-              )}
-            </div>
-            <button
-              type="button"
-              className="logout-button"
-              onClick={() => onLogout?.()}
-            >
-              Log out
-            </button>
-          </div>
+          {sessionUser?.role && (
+            <span className="status role-status">{String(sessionUser.role).toUpperCase()}</span>
+          )}
+          <span className="status">API v0.9</span>
         </div>
       </header>
 
