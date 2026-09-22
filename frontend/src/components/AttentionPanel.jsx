@@ -16,7 +16,7 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
     { key: "over_budget_plans", label: "over budget", tone: "danger" },
   ];
 
-  if (loading && !normalizedAttention?.totals) {
+  if (loading && !attention) {
     return (
       <section className="attention-panel" aria-live="polite" aria-busy="true">
         <div className="panel-heading">
@@ -130,8 +130,14 @@ function AttentionColumn({ title, empty, items, render, onOpen }) {
       <div className="attention-col-head">
         <h3>{title}</h3>
         {onOpen && (
-          <button type="button" className="linkish" onClick={onOpen}>
-            Open
+          <button
+            type="button"
+            className="attention-open-button"
+            onClick={onOpen}
+            aria-label={`Open ${title.toLowerCase()}`}
+          >
+            <span>View details</span>
+            <span className="attention-open-arrow" aria-hidden="true">→</span>
           </button>
         )}
       </div>
