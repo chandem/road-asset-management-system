@@ -71,8 +71,17 @@ Check: `GET /api/v1/storage/status` (authenticated).
 
 - Queues live in **IndexedDB** on the device.
 - Sync retries automatically when online.
-- After repeated permanent failures (duplicate / validation), records are marked **`conflict`** with `last_error` and stop retrying until the user removes or fixes them.
+- After repeated permanent failures (duplicate / validation / 4xx), records are marked **`conflict`** with `last_error` and stop auto-retry.
+- In **Field → Offline Inspection / Defect** queues:
+  - **Pending** / **Conflicts** counters
+  - Status pill + attempt count + last error
+  - **Retry** (clears conflict and re-queues)
+  - **Discard** (deletes the local row)
 - Idempotent `client_id` on inspections/defects avoids double-create when the same offline row syncs twice.
+
+## Empty portfolio
+
+If Overview shows zero roads, the UI suggests **Operations → Roads** or running **RAMS Seed Demo Data**.
 
 ## Road geometry & sections
 
@@ -88,3 +97,4 @@ Check: `GET /api/v1/storage/status` (authenticated).
 | Port scan timeout | Bind `0.0.0.0:$PORT` |
 | Photos vanish | Enable `STORAGE_BACKEND=s3` |
 | AI empty | Expected if `AI_STUB_MODE=true` or missing weights |
+| Offline stuck | Check conflict rows → Retry or Discard |
