@@ -325,12 +325,28 @@ th, td { text-align: left; padding: 0.65rem 0.55rem; border-bottom: 1px solid va
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  text-align: center;
+}
+.auth-card > h1,
+.auth-card > .auth-subtitle,
+.auth-card > label,
+.auth-card > .auth-error,
+.auth-card > .auth-button {
+  text-align: left;
+}
+.auth-card > h1,
+.auth-card > .auth-subtitle {
+  text-align: center;
+}
+.auth-card > label {
+  width: 100%;
 }
 .auth-logo {
   width: 48px; height: 48px; border-radius: 12px;
   display: grid; place-items: center;
   font-weight: 800; color: #fff;
   background: linear-gradient(135deg, #0284c7, #6366f1);
+  margin: 0 auto;
 }
 .auth-button {
   border: none;
@@ -340,6 +356,7 @@ th, td { text-align: left; padding: 0.65rem 0.55rem; border-bottom: 1px solid va
   padding: 0.7rem 1rem;
   border-radius: 10px;
   cursor: pointer;
+  width: 100%;
 }
 
 @media (max-width: 1100px) {
