@@ -14,7 +14,7 @@ export default function EmptyState({
         {children ? <div className="empty-state-copy">{children}</div> : null}
       </div>
       {actions.length > 0 && (
-        <div className="empty-state-actions">
+        <div className="empty-state-actions" aria-label="Suggested actions">
           {actions.map((action) => (
             <button
               key={action.label}
@@ -22,6 +22,7 @@ export default function EmptyState({
               className={action.primary ? "primary" : undefined}
               onClick={action.onClick}
               disabled={action.disabled}
+              aria-label={action.ariaLabel || action.label}
             >
               {action.label}
             </button>
