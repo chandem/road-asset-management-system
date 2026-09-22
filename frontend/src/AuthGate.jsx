@@ -42,8 +42,17 @@ export default function AuthGate() {
         const detail = typeof data.detail === "string" ? data.detail : "Login failed";
         throw new Error(detail);
       }
+      if (!data.access_token) {
+        throw new Error("Login response missing access token");
+      }
       setToken(data.access_token);
-      setUser(data);
+      // LoginResponse is flat: access_token + user fields (not nested under .user)
+      setUser({
+        user_id: data.user_id,
+        username: data.username,
+        full_name: data.full_name,
+        role: data.role,
+      });
       setPassword("");
     } catch (err) {
       setError(err.message || "Unable to log in");
@@ -106,19 +115,6 @@ export default function AuthGate() {
     );
   }
 
-  return (
-    <>
-      <div className="auth-userbar">
-        <span className="auth-userbar-identity">
-          Signed in as <strong>{user.full_name || user.username}</strong>
-          {" · "}
-          <span className="role-badge">{user.role}</span>
-        </span>
-        <button type="button" className="logout-button" onClick={logout}>
-          Log out
-        </button>
-      </div>
-      <App user={user} />
-    </>
-  );
+  // App owns chrome (topbar + userbar). Pass authUser + logout handler.
+  return <App authUser={user} onLogout={logout} />;
 }
