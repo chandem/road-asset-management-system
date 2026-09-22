@@ -11,6 +11,7 @@ import OfflineDefectQueue from "./OfflineDefectQueue";
 import OfflinePhotoQueue from "./OfflinePhotoQueue";
 import RAMSMap from "./RAMSMap";
 import SummaryCards from "./components/SummaryCards";
+import EmptyState from "./components/EmptyState";
 import ReportPanel from "./components/ReportPanel";
 import AttentionPanel from "./components/AttentionPanel";
 import KPIDashboard from "./components/KPIDashboard";
@@ -49,235 +50,430 @@ function buildReport(summaryCounts, roads, sections, allMaintenance, inspections
       return roadId == null || String(roadId) === String(road?.road_id);
     });
     const values = roadSections
-      .map((section) => Number(section?.condition_rating))
-      .filter((value) => Number.isFinite(value));
+      .map((section) => Number(section?.condition_index ?? section?.condition_rating))
+      .filter((n) => Number.isFinite(n));
+    const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
     return {
-      road_id: road?.road_id,
-      road_code: road?.road_code || "",
-      road_name: road?.road_name || "",
-      sectionCount: roadSections.length,
-      condition: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null,
-      total_length_km: road?.total_length_km ?? null,
-      status: road?.status || "",
+      road_code: road?.road_code,
+      name: road?.name,
+      sections: roadSections.length,
+      avg_condition: avg == null ? null : Number(avg.toFixed(1)),
     };
   });
 
-  const estimated = (allMaintenance || []).reduce(
-    (sum, item) => sum + (Number(item?.estimated_cost) || 0), 0
-  );
-  const actual = (allMaintenance || []).reduce(
-    (sum, item) => sum + (Number(item?.actual_cost) || 0), 0
-  );
-  const completed = (allMaintenance || []).filter(
-    (item) => item?.status === "completed"
-  ).length;
-
   return {
-    averageCondition: null,
-    inspectionCount: summaryCounts?.inspections ?? inspections?.length ?? 0,
-    defects: summaryCounts?.defects ?? defects.length,
-    planned: summaryCounts?.maintenance ?? allMaintenance?.length ?? 0,
-    completed,
-    estimated,
-    actual,
+    generated_at: new Date().toISOString(),
+    counts: summaryCounts || {
+      roads: roads?.length || 0,
+      sections: sections?.length || 0,
+      defects: defects.length,
+    },
     severity,
     types,
     roadCondition,
+    maintenance: {
+      total: (allMaintenance || []).length,
+      completed: (allMaintenance || []).filter((m) => String(m?.status || "").toLowerCase() === "completed").length,
+    },
+    inspections: (inspections || []).length,
   };
 }
 
-function App({ user }) {
-  const [roads, setRoads] = useState([]); const [roadGeoJSON, setRoadGeoJSON] = useState(null); const [gpsGeoJSON, setGpsGeoJSON] = useState(null);
-  const [sectionGeoJSON, setSectionGeoJSON] = useState(null); const [assetGeoJSON, setAssetGeoJSON] = useState(null); const [defectGeoJSON, setDefectGeoJSON] = useState(null);
-  const [sections, setSections] = useState([]); const [inspections, setInspections] = useState([]); const [allMaintenance, setAllMaintenance] = useState([]);
-  const [visible, setVisible] = useState({ roads: true, gps: true, sections: true, assets: true, defects: true, chainage: true, maintenance: true });
-  const [showForm, setShowForm] = useState(false); const [formType, setFormType] = useState("inspection");
-  const [form, setForm] = useState({ section_id: "", inspection_date: new Date().toISOString().slice(0, 10), condition_rating: "", weather: "", notes: "", inspection_id: "", defect_type: "", severity: "", chainage_km: "", length_m: "", width_m: "", depth_mm: "", description: "", detected_by: "manual" });
-  const [photo, setPhoto] = useState({ file: null, inspection_id: "", defect_id: "", latitude: "", longitude: "", captured_at: "" });
-  const [uploadedImageId, setUploadedImageId] = useState(null); const [aiResults, setAiResults] = useState([]); const [aiRunning, setAiRunning] = useState(false);
-  const [aiStatus, setAiStatus] = useState(null);
-  const [aiMessage, setAiMessage] = useState("");
-  const [saving, setSaving] = useState(false); const [message, setMessage] = useState(""); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+export default function App({ authUser, onLogout }) {
+  const role = normalizeRole(authUser?.role);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [roads, setRoads] = useState([]);
+  const [sections, setSections] = useState([]);
   const [summaryCounts, setSummaryCounts] = useState(null);
   const [attention, setAttention] = useState(null);
   const [kpis, setKpis] = useState(null);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [maintenanceRoadId, setMaintenanceRoadId] = useState(""); const [maintenance, setMaintenance] = useState([]);
+  const [roadGeoJSON, setRoadGeoJSON] = useState(null);
+  const [sectionGeoJSON, setSectionGeoJSON] = useState(null);
+  const [assetGeoJSON, setAssetGeoJSON] = useState(null);
+  const [defectGeoJSON, setDefectGeoJSON] = useState(null);
+  const [gpsGeoJSON, setGpsGeoJSON] = useState(null);
+  const [maintenance, setMaintenance] = useState([]);
+  const [maintenanceRoadId, setMaintenanceRoadId] = useState("");
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
-  const [maintenanceForm, setMaintenanceForm] = useState({ section_id: "", chainage_km: "", activity_type: "", priority: "medium", planned_date: "", completed_date: "", estimated_cost: "", actual_cost: "", contractor: "", status: "planned", description: "" });
-  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
-
-  useEffect(() => {
-    const on = () => setOnline(true); const off = () => setOnline(false);
-    window.addEventListener("online", on); window.addEventListener("offline", off);
-    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
-  }, []);
+  const [maintenanceForm, setMaintenanceForm] = useState({ activity_type: "", planned_date: "", status: "planned", estimated_cost: "", actual_cost: "" });
+  const [photo, setPhoto] = useState({ file: null, inspection_id: "", defect_id: "", latitude: "", longitude: "" });
+  const [uploadedImageId, setUploadedImageId] = useState(null);
+  const [aiResults, setAiResults] = useState(null);
+  const [aiRunning, setAiRunning] = useState(false);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [aiMessage, setAiMessage] = useState("");
+  const [formOpen, setFormOpen] = useState(null);
+  const [visible, setVisible] = useState({ roads: true, sections: true, assets: true, defects: true, gps: true });
 
   async function loadDashboard() {
-    setLoading(true); setError("");
+    setLoading(true);
+    setMessage("");
     try {
-      const soft = (p) => p.catch(() => null);
-      const [summary, rg, gg, dg, dashboardKpis] = await Promise.all([
-        getDashboardSummary(),
-        soft(getRoadGeoJSON()),
-        soft(getGPSTrackGeoJSON()),
-        soft(getDefectGeoJSON()),
-        soft(getDashboardKPIs()),
+      const [summary, attentionData, kpiData, roadsGeo, sectionsGeo, assetsGeo, defectsGeo, gpsGeo] = await Promise.all([
+        getDashboardSummary().catch(() => null),
+        getDashboardAttention().catch(() => null),
+        getDashboardKPIs().catch(() => null),
+        getRoadGeoJSON().catch(() => null),
+        getSectionsGeoJSON().catch(() => null),
+        getAssetsGeoJSON().catch(() => null),
+        getDefectGeoJSON().catch(() => null),
+        getGPSTrackGeoJSON().catch(() => null),
       ]);
-      setRoads(summary.roads || []);
-      setSections(summary.sections || []);
-      setInspections(Array(summary.counts?.inspections || 0).fill(null));
-      setAllMaintenance(Array(summary.counts?.maintenance || 0).fill(null));
-      setRoadGeoJSON(rg);
-      setGpsGeoJSON(gg);
-      setDefectGeoJSON(dg);
-      setSummaryCounts(summary.counts || null);
-      setKpis(dashboardKpis);
-      try {
-        setAttention(await getDashboardAttention());
-      } catch (_) {
-        setAttention(null);
-      }
-
-      const [sg, ag] = await Promise.all([
-        soft(getSectionsGeoJSON()),
-        soft(getAssetsGeoJSON()),
-      ]);
-      setSectionGeoJSON(sg || { type: "FeatureCollection", features: [] });
-      setAssetGeoJSON(ag || { type: "FeatureCollection", features: [] });
-    } catch (e) {
-      setError(e.message || String(e));
+      setSummaryCounts(summary?.counts || summary || null);
+      setAttention(attentionData);
+      setKpis(kpiData);
+      setRoadGeoJSON(roadsGeo);
+      setSectionGeoJSON(sectionsGeo);
+      setAssetGeoJSON(assetsGeo);
+      setDefectGeoJSON(defectsGeo);
+      setGpsGeoJSON(gpsGeo);
+      const roadList = summary?.roads || roadsGeo?.features?.map((f) => ({ ...(f.properties || {}), road_id: f.properties?.road_id })) || [];
+      const sectionList =
+        summary?.sections ||
+        sectionsGeo?.features?.map((f) => ({ ...(f.properties || {}), section_id: f.properties?.section_id })) ||
+        [];
+      setRoads(roadList);
+      setSections(sectionList);
+    } catch (error) {
+      setMessage(error.message || "Failed to load dashboard");
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { loadDashboard(); }, []);
+  useEffect(() => {
+    loadDashboard();
+  }, []);
 
   useEffect(() => {
     if (activeTab !== "field") return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const status = await getAIStatus();
-        if (!cancelled) setAiStatus(status);
-      } catch (e) {
-        if (!cancelled) setAiStatus({ ready: false, stub_mode: false, message: e.message || "Could not load AI status" });
-      }
-    })();
-    return () => { cancelled = true; };
+    getAIStatus()
+      .then(setAiStatus)
+      .catch(() => setAiStatus(null));
   }, [activeTab]);
 
   async function loadMaintenance(roadId) {
-    if (!roadId) { setMaintenance([]); return; }
+    if (!roadId) {
+      setMaintenance([]);
+      return;
+    }
     setMaintenanceLoading(true);
-    try { setMaintenance(await getRoadMaintenance(roadId)); } catch (_) { setMaintenance([]); }
-    finally { setMaintenanceLoading(false); }
-  }
-  useEffect(() => { loadMaintenance(maintenanceRoadId); }, [maintenanceRoadId]);
-
-  function toggleLayer(key) { setVisible((v) => ({ ...v, [key]: !v[key] })); }
-  function openForm(type) { setFormType(type); setShowForm(true); setMessage(""); }
-  function update(field, value) { setForm((f) => ({ ...f, [field]: value })); }
-  function updatePhoto(field, value) { setPhoto((p) => ({ ...p, [field]: value })); }
-  function updateMaintenance(field, value) { setMaintenanceForm((f) => ({ ...f, [field]: value })); }
-
-  async function submitForm(e) {
-    e.preventDefault(); setSaving(true); setMessage("");
     try {
-      if (formType === "inspection") {
-        await createInspection(form.section_id, { inspection_date: form.inspection_date, condition_rating: form.condition_rating ? Number(form.condition_rating) : null, weather: form.weather || null, notes: form.notes || null });
-        setMessage("Inspection saved.");
-      } else {
-        if (!form.inspection_id) throw new Error("Inspection ID is required to create a defect");
-        await createDefect(Number(form.inspection_id), { section_id: form.section_id ? Number(form.section_id) : null, defect_type: form.defect_type, severity: form.severity || null, chainage_km: form.chainage_km ? Number(form.chainage_km) : null, length_m: form.length_m ? Number(form.length_m) : null, width_m: form.width_m ? Number(form.width_m) : null, depth_mm: form.depth_mm ? Number(form.depth_mm) : null, description: form.description || null, detected_by: form.detected_by || "manual" });
-        setMessage("Defect saved.");
-      }
-      setShowForm(false); await loadDashboard();
-    } catch (err) { setMessage(err.message || String(err)); }
-    finally { setSaving(false); }
+      const rows = await getRoadMaintenance(roadId);
+      setMaintenance(rows || []);
+    } catch (error) {
+      setMessage(error.message || "Failed to load maintenance");
+    } finally {
+      setMaintenanceLoading(false);
+    }
   }
 
-  async function submitMaintenance(e) {
-    e.preventDefault(); if (!maintenanceRoadId) return;
-    setSaving(true); setMessage("");
+  useEffect(() => {
+    if (maintenanceRoadId) loadMaintenance(maintenanceRoadId);
+  }, [maintenanceRoadId]);
+
+  function toggleLayer(key) {
+    setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function openForm(kind) {
+    setFormOpen(kind);
+  }
+
+  function updateMaintenance(field, value) {
+    setMaintenanceForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function updatePhoto(field, value) {
+    setPhoto((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function submitMaintenance(event) {
+    event.preventDefault();
+    if (!maintenanceRoadId) return;
+    setSaving(true);
     try {
-      await createMaintenance(maintenanceRoadId, { activity_type: maintenanceForm.activity_type, priority: maintenanceForm.priority || null, planned_date: maintenanceForm.planned_date || null, completed_date: maintenanceForm.completed_date || null, estimated_cost: maintenanceForm.estimated_cost ? Number(maintenanceForm.estimated_cost) : null, actual_cost: maintenanceForm.actual_cost ? Number(maintenanceForm.actual_cost) : null, contractor: maintenanceForm.contractor || null, description: maintenanceForm.description || null, status: maintenanceForm.status || "planned", section_id: maintenanceForm.section_id ? Number(maintenanceForm.section_id) : null, chainage_km: maintenanceForm.chainage_km ? Number(maintenanceForm.chainage_km) : null });
+      await createMaintenance(maintenanceRoadId, {
+        activity_type: maintenanceForm.activity_type,
+        planned_date: maintenanceForm.planned_date || null,
+        status: maintenanceForm.status,
+        estimated_cost: maintenanceForm.estimated_cost === "" ? null : Number(maintenanceForm.estimated_cost),
+        actual_cost: maintenanceForm.actual_cost === "" ? null : Number(maintenanceForm.actual_cost),
+      });
       setMessage("Maintenance activity saved.");
-      setMaintenanceForm({ section_id: "", chainage_km: "", activity_type: "", priority: "medium", planned_date: "", completed_date: "", estimated_cost: "", actual_cost: "", contractor: "", status: "planned", description: "" });
-      await loadMaintenance(maintenanceRoadId); await loadDashboard();
-    } catch (err) { setMessage(err.message || String(err)); }
-    finally { setSaving(false); }
+      setMaintenanceForm({ activity_type: "", planned_date: "", status: "planned", estimated_cost: "", actual_cost: "" });
+      await loadMaintenance(maintenanceRoadId);
+    } catch (error) {
+      setMessage(error.message || "Could not save maintenance");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  async function submitPhoto(e) {
-    e.preventDefault(); if (!photo.file) return;
-    setSaving(true); setMessage("");
+  async function submitPhoto(event) {
+    event.preventDefault();
+    if (!photo.file) {
+      setMessage("Choose a photo file first.");
+      return;
+    }
+    setSaving(true);
+    setAiMessage("");
     try {
-      const img = await uploadImage({ file: photo.file, inspectionId: photo.inspection_id || null, defectId: photo.defect_id || null, latitude: photo.latitude || null, longitude: photo.longitude || null, capturedAt: photo.captured_at || null });
-      setUploadedImageId(img.image_id); setMessage(`Photo uploaded (id ${img.image_id}).`);
-    } catch (err) { setMessage(err.message || String(err)); }
-    finally { setSaving(false); }
+      const result = await uploadImage({
+        file: photo.file,
+        inspectionId: photo.inspection_id || null,
+        defectId: photo.defect_id || null,
+        latitude: photo.latitude === "" ? null : Number(photo.latitude),
+        longitude: photo.longitude === "" ? null : Number(photo.longitude),
+      });
+      setUploadedImageId(result?.image_id || result?.id || null);
+      setMessage("Photo uploaded.");
+    } catch (error) {
+      setMessage(error.message || "Photo upload failed");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function detectPhoto() {
-    if (!uploadedImageId) return;
-    setAiRunning(true); setAiMessage("");
+    if (!uploadedImageId) {
+      setAiMessage("Upload a photo first.");
+      return;
+    }
+    setAiRunning(true);
+    setAiMessage("");
     try {
-      const results = await runAIDetection(uploadedImageId);
-      const list = Array.isArray(results) ? results : results?.detections || [];
-      setAiResults(list);
-      setAiMessage(list.length === 0 ? (aiStatus?.stub_mode ? "Stub mode: no detections returned (model not loaded)." : "No defects detected above the confidence threshold.") : `Stored ${list.length} detection(s).`);
-    } catch (err) { setAiMessage(err.message || String(err)); }
-    finally { setAiRunning(false); }
+      const result = await runAIDetection(uploadedImageId);
+      setAiResults(result);
+      setAiMessage("Detection finished.");
+    } catch (error) {
+      setAiMessage(error.message || "AI detection failed");
+    } finally {
+      setAiRunning(false);
+    }
   }
 
   async function loadExistingDetections() {
     if (!uploadedImageId) return;
-    try { const results = await getAIDetections(uploadedImageId); setAiResults(Array.isArray(results) ? results : results?.detections || []); }
-    catch (err) { setMessage(err.message || String(err)); }
+    try {
+      const result = await getAIDetections(uploadedImageId);
+      setAiResults(result);
+    } catch (error) {
+      setAiMessage(error.message || "Could not load detections");
+    }
   }
 
   function captureGPS() {
-    if (!navigator.geolocation) { setMessage("Geolocation not available"); return; }
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setPhoto((p) => ({ ...p, latitude: String(pos.coords.latitude), longitude: String(pos.coords.longitude), captured_at: new Date().toISOString() }));
-    }, () => setMessage("Unable to read GPS position"), { enableHighAccuracy: true, timeout: 10000 });
+    if (!navigator.geolocation) {
+      setMessage("Geolocation is not available in this browser.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPhoto((prev) => ({
+          ...prev,
+          latitude: String(pos.coords.latitude),
+          longitude: String(pos.coords.longitude),
+        }));
+      },
+      () => setMessage("Could not read GPS position."),
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
   }
 
-  const report = useMemo(() => buildReport(summaryCounts, roads, sections, allMaintenance, inspections, defectGeoJSON), [summaryCounts, roads, sections, allMaintenance, inspections, defectGeoJSON]);
+  const report = useMemo(
+    () => buildReport(summaryCounts, roads, sections, maintenance, [], defectGeoJSON),
+    [summaryCounts, roads, sections, maintenance, defectGeoJSON],
+  );
 
-  const completedCount = maintenance.filter((m) => m.status === "completed").length;
-  const estimatedTotal = maintenance.reduce((s, m) => s + (Number(m.estimated_cost) || 0), 0);
-  const actualTotal = maintenance.reduce((s, m) => s + (Number(m.actual_cost) || 0), 0);
+  const completedCount = maintenance.filter((m) => String(m?.status || "").toLowerCase() === "completed").length;
+  const estimatedTotal = maintenance.reduce((sum, m) => sum + (Number(m.estimated_cost) || 0), 0);
+  const actualTotal = maintenance.reduce((sum, m) => sum + (Number(m.actual_cost) || 0), 0);
 
-  const role = normalizeRole(user?.role);
   const navGroups = filterNavGroups(role);
-  const activeGroup = navGroups.find((g) => g.tabs.some((t) => t.id === activeTab)) || navGroups[0] || { id: "home", label: "Home", tabs: [{ id: "overview", label: "Overview" }] };
-  const groupTabs = activeGroup.tabs;
+  const activeGroup =
+    navGroups.find((g) => g.tabs.some((t) => t.id === activeTab)) ||
+    navGroups[0] || { id: "home", label: "Home", tabs: [{ id: "overview", label: "Overview" }] };
+  const groupTabs = activeGroup.tabs || [];
 
   useEffect(() => {
     if (!canAccessTab(activeTab, role) && groupTabs[0]) setActiveTab(groupTabs[0].id);
-  }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [role, activeTab, groupTabs]);
 
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div><h1>Road Asset Management System</h1><p>RAMS · Road infrastructure management dashboard</p></div>
-        <div className="topbar-status"><span className={`connectivity ${online ? "online" : "offline"}`}>{online ? "● Online" : "○ Offline"}</span><span className="status role-status">{role}</span><span className="status">API v0.9</span></div>
+        <div>
+          <h1>Road Asset Management System</h1>
+          <p>Network condition, maintenance, and field operations</p>
+        </div>
+        <div className="topbar-status">
+          <span className={`connectivity ${navigator.onLine ? "online" : "offline"}`}>
+            {navigator.onLine ? "Online" : "Offline"}
+          </span>
+          {authUser?.username && (
+            <span className="role-status">{authUser.username}</span>
+          )}
+        </div>
       </header>
-      <nav className="app-nav" aria-label="Main">
-        <div className="nav-groups" role="tablist" aria-label="Sections">{navGroups.map((group) => <button key={group.id} type="button" role="tab" aria-selected={activeGroup.id === group.id} className={`nav-group${activeGroup.id === group.id ? " active" : ""}`} onClick={() => { if (activeGroup.id !== group.id) setActiveTab(group.tabs[0].id); }}>{group.label}</button>)}</div>
-        <div className="nav-tabs" role="tablist" aria-label={activeGroup.label}>{groupTabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} className={`nav-tab${activeTab === tab.id ? " active" : ""}`} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}</div>
+
+      <div className="auth-userbar">
+        <div className="auth-userbar-identity">
+          Signed in as <strong>{authUser?.full_name || authUser?.username || "User"}</strong>
+          {authUser?.role && <span className="role-badge">{authUser.role}</span>}
+        </div>
+        <button type="button" className="logout-button" onClick={onLogout}>
+          Log out
+        </button>
+      </div>
+
+      <nav className="app-nav">
+        <div className="nav-groups" role="tablist" aria-label="Sections">
+          {navGroups.map((group) => (
+            <button
+              key={group.id}
+              type="button"
+              role="tab"
+              aria-selected={activeGroup.id === group.id}
+              className={`nav-group${activeGroup.id === group.id ? " active" : ""}`}
+              onClick={() => {
+                if (activeGroup.id !== group.id) setActiveTab(group.tabs[0].id);
+              }}
+            >
+              {group.label}
+            </button>
+          ))}
+        </div>
+        <div className="nav-tabs" role="tablist" aria-label={activeGroup.label}>
+          {groupTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              className={`nav-tab${activeTab === tab.id ? " active" : ""}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </nav>
+
       <main className="dashboard">
-        {error && <div className="error-banner">API connection: {error}</div>}
-        {!online && <div className="offline-banner">Offline field mode · New inspections, defects and photos can be captured locally and synchronized when connectivity returns.</div>}
-        {activeTab === "overview" && <><SummaryCards loading={loading} counts={summaryCounts} roads={roads} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} /><KPIDashboard kpis={kpis} loading={loading} /><AttentionPanel attention={attention} loading={loading} onNavigate={setActiveTab} /><ReportPanel report={report} onRefresh={loadDashboard} /><RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} /></>}
-        {activeTab === "map" && <RAMSMap roadGeoJSON={roadGeoJSON} gpsGeoJSON={gpsGeoJSON} sectionGeoJSON={sectionGeoJSON} assetGeoJSON={assetGeoJSON} defectGeoJSON={defectGeoJSON} visible={visible} toggleLayer={toggleLayer} loading={loading} />}
-        {activeTab === "field" && <><section className="action-panel"><h2>Field Data Entry</h2><p>Create inspections, defects and field photos.</p><div className="actions"><button type="button" onClick={() => openForm("inspection")}>+ New Inspection</button><button type="button" onClick={() => openForm("defect")}>+ New Defect</button></div></section><OfflineInspectionQueue sections={sections} /><OfflineDefectQueue sections={sections} /><OfflinePhotoQueue /><FieldGPS /><PhotoAIPanel photo={photo} updatePhoto={updatePhoto} submitPhoto={submitPhoto} captureGPS={captureGPS} saving={saving} uploadedImageId={uploadedImageId} aiResults={aiResults} aiRunning={aiRunning} detectPhoto={detectPhoto} loadExistingDetections={loadExistingDetections} aiStatus={aiStatus} aiMessage={aiMessage} /></>}
+        {message && <div className="message-info">{message}</div>}
+
+        {activeTab === "overview" && (
+          <>
+            <SummaryCards
+              loading={loading}
+              counts={summaryCounts}
+              roads={roads}
+              gpsGeoJSON={gpsGeoJSON}
+              sectionGeoJSON={sectionGeoJSON}
+              assetGeoJSON={assetGeoJSON}
+              defectGeoJSON={defectGeoJSON}
+            />
+            {!loading && (summaryCounts?.roads ?? roads?.length ?? 0) === 0 && (
+              <EmptyState
+                title="No roads in the register yet"
+                tone="info"
+                actions={[
+                  { label: "Go to Roads", primary: true, onClick: () => setActiveTab("roads") },
+                  { label: "Open Map", onClick: () => setActiveTab("map") },
+                ]}
+              >
+                <p>
+                  Add a road under <strong>Operations → Roads</strong>, draw geometry on the map,
+                  then generate 500&nbsp;m sections. For demos, run the GitHub Action{" "}
+                  <strong>RAMS Seed Demo Data</strong>.
+                </p>
+              </EmptyState>
+            )}
+            <KPIDashboard kpis={kpis} loading={loading} />
+            <AttentionPanel attention={attention} loading={loading} onNavigate={setActiveTab} />
+            <ReportPanel report={report} onRefresh={loadDashboard} />
+            <RAMSMap
+              roadGeoJSON={roadGeoJSON}
+              gpsGeoJSON={gpsGeoJSON}
+              sectionGeoJSON={sectionGeoJSON}
+              assetGeoJSON={assetGeoJSON}
+              defectGeoJSON={defectGeoJSON}
+              visible={visible}
+              toggleLayer={toggleLayer}
+              loading={loading}
+            />
+          </>
+        )}
+        {activeTab === "map" && (
+          <RAMSMap
+            roadGeoJSON={roadGeoJSON}
+            gpsGeoJSON={gpsGeoJSON}
+            sectionGeoJSON={sectionGeoJSON}
+            assetGeoJSON={assetGeoJSON}
+            defectGeoJSON={defectGeoJSON}
+            visible={visible}
+            toggleLayer={toggleLayer}
+            loading={loading}
+          />
+        )}
+        {activeTab === "field" && (
+          <>
+            <section className="action-panel">
+              <h2>Field Data Entry</h2>
+              <p>Create inspections, defects and field photos.</p>
+              <div className="actions">
+                <button type="button" onClick={() => openForm("inspection")}>
+                  + New Inspection
+                </button>
+                <button type="button" onClick={() => openForm("defect")}>
+                  + New Defect
+                </button>
+              </div>
+            </section>
+            <OfflineInspectionQueue sections={sections} />
+            <OfflineDefectQueue sections={sections} />
+            <OfflinePhotoQueue />
+            <FieldGPS />
+            <PhotoAIPanel
+              photo={photo}
+              updatePhoto={updatePhoto}
+              submitPhoto={submitPhoto}
+              captureGPS={captureGPS}
+              saving={saving}
+              uploadedImageId={uploadedImageId}
+              aiResults={aiResults}
+              aiRunning={aiRunning}
+              detectPhoto={detectPhoto}
+              loadExistingDetections={loadExistingDetections}
+              aiStatus={aiStatus}
+              aiMessage={aiMessage}
+            />
+          </>
+        )}
         {activeTab === "roads" && <RoadRegister />}
-        {activeTab === "maintenance" && <MaintenanceSection roads={roads} sections={sections} maintenanceRoadId={maintenanceRoadId} setMaintenanceRoadId={setMaintenanceRoadId} maintenance={maintenance} maintenanceLoading={maintenanceLoading} maintenanceForm={maintenanceForm} updateMaintenance={updateMaintenance} submitMaintenance={submitMaintenance} loadMaintenance={loadMaintenance} saving={saving} message={message} completedCount={completedCount} estimatedTotal={estimatedTotal} actualTotal={actualTotal} />}
+        {activeTab === "maintenance" && (
+          <MaintenanceSection
+            roads={roads}
+            sections={sections}
+            maintenanceRoadId={maintenanceRoadId}
+            setMaintenanceRoadId={setMaintenanceRoadId}
+            maintenance={maintenance}
+            maintenanceLoading={maintenanceLoading}
+            maintenanceForm={maintenanceForm}
+            updateMaintenance={updateMaintenance}
+            submitMaintenance={submitMaintenance}
+            loadMaintenance={loadMaintenance}
+            saving={saving}
+            message={message}
+            completedCount={completedCount}
+            estimatedTotal={estimatedTotal}
+            actualTotal={actualTotal}
+          />
+        )}
         {activeTab === "planning" && <MaintenancePlanning />}
         {activeTab === "condition" && <ConditionAssessment />}
         {activeTab === "analytics" && <MaintenanceAnalytics />}
@@ -288,10 +484,19 @@ function App({ user }) {
         {activeTab === "assets" && <AssetRegister />}
         {activeTab === "reports" && <Reports />}
         {activeTab === "audit" && <AuditHistory />}
-        {showForm && <InspectionDefectForm formType={formType} form={form} update={update} sections={sections} submitForm={submitForm} saving={saving} message={message} onClose={() => setShowForm(false)} />}
       </main>
+
+      {formOpen && (
+        <InspectionDefectForm
+          kind={formOpen}
+          sections={sections}
+          onClose={() => setFormOpen(null)}
+          onSaved={() => {
+            setFormOpen(null);
+            loadDashboard();
+          }}
+        />
+      )}
     </div>
   );
 }
-
-export default App;
