@@ -343,8 +343,8 @@ export default function App({ authUser, user, onLogout }) {
 
       <header className="topbar">
         <div className="topbar-brand">
-          <h1>Road Asset Management System</h1>
-          <p>RAMS · Road infrastructure management dashboard</p>
+          <h1>RoadAMS</h1>
+          <p>Road Asset Management System · Digital road infrastructure management dashboard</p>
         </div>
         <div className="topbar-status">
           <span className={`connectivity ${navigator.onLine ? "online" : "offline"}`}>
@@ -417,7 +417,7 @@ export default function App({ authUser, user, onLogout }) {
                 <p>
                   Add a road under <strong>Operations → Roads</strong>, draw geometry on the map,
                   then generate 500&nbsp;m sections. For demos, run the GitHub Action{" "}
-                  <strong>RAMS Seed Demo Data</strong>.
+                  <strong>RoadAMS Seed Demo Data</strong>.
                 </p>
               </EmptyState>
             )}
