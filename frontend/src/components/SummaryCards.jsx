@@ -28,7 +28,7 @@ export default function SummaryCards(props) {
               <span>{item.label}</span>
             </div>
             <strong aria-live="polite" className={loading ? "value-loading" : undefined}>
-              {loading ? "" : value.toLocaleString()}
+              {loading ? "…" : value.toLocaleString()}
             </strong>
             <span className="summary-card-caption">
               {item.key === "defects" ? "Reported items" : "In register"}
