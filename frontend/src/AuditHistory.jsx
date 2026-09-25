@@ -6,6 +6,7 @@ import {
   getWorkOrderHistory,
   getWorkOrders,
 } from "./api";
+import EmptyState from "./components/EmptyState";
 
 function formatWhen(value) {
   if (!value) return "—";
@@ -177,11 +178,22 @@ export default function AuditHistory() {
         </div>
       </form>
 
-      {message && <p className="form-message">{message}</p>}
-
-      {!loadingHistory && selectedId && history.length === 0 && !message && (
-        <p>No history records for this item.</p>
+      {!selectedId && !loadingList && (
+        <EmptyState title="Select a record to view audit history" icon="☰" tone="info">
+          <p>
+            Choose a work order or maintenance activity above, then load history
+            to see who changed fields and what values moved.
+          </p>
+        </EmptyState>
       )}
+
+      {selectedId && !loadingHistory && history.length === 0 && !message && (
+        <EmptyState title="No audit events for this record" icon="—" tone="muted">
+          <p>This record has no stored change history yet.</p>
+        </EmptyState>
+      )}
+
+      {message && <p className="form-message">{message}</p>}
 
       {history.length > 0 && (
         <div className="table-wrap">
