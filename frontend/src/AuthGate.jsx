@@ -70,8 +70,13 @@ export default function AuthGate() {
     return (
       <div className="auth-screen">
         <div className="auth-card">
-          <div className="auth-logo">RoadMI</div>
-          <h1>RoadMI</h1><p className="auth-product-name">Road Asset Management System</p>
+          <div className="auth-brand">
+            <div className="auth-logo" aria-hidden="true">RM</div>
+            <div className="auth-brand-text">
+              <h1>RoadMI</h1>
+              <p className="auth-product-name">Road Asset Management System</p>
+            </div>
+          </div>
           <p className="auth-subtitle">Restoring your session…</p>
         </div>
       </div>
@@ -82,8 +87,13 @@ export default function AuthGate() {
     return (
       <div className="auth-screen">
         <form className="auth-card" onSubmit={handleLogin}>
-          <div className="auth-logo">RoadMI</div>
-          <h1>RoadMI</h1><p className="auth-product-name">Road Asset Management System</p>
+          <div className="auth-brand">
+            <div className="auth-logo" aria-hidden="true">RM</div>
+            <div className="auth-brand-text">
+              <h1>RoadMI</h1>
+              <p className="auth-product-name">Road Asset Management System</p>
+            </div>
+          </div>
           <p className="auth-subtitle">Sign in to manage roads, assets, and field work</p>
           <label>
             Username
