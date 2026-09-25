@@ -7,7 +7,7 @@ def _csv_env(name: str, default: str = "") -> list[str]:
 
 
 class Settings:
-    app_name = os.getenv("APP_NAME", "Road Asset Management System")
+    app_name = os.getenv("APP_NAME", "RoadAMS — Road Asset Management System")
     debug = os.getenv("DEBUG", "false").lower() == "true"
     database_url = os.getenv("DATABASE_URL")
     cors_allowed_origins = _csv_env(
