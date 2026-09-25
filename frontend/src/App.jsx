@@ -343,7 +343,8 @@ export default function App({ authUser, user, onLogout }) {
 
       <header className="topbar">
         <div className="topbar-brand">
-          <div>
+          <div className="topbar-logo" aria-hidden="true">RM</div>
+          <div className="topbar-brand-text">
             <h1>RoadMI</h1>
             <p>Road Asset Management System</p>
           </div>
