@@ -1,7 +1,7 @@
 {
-  "name": "Road Asset Management System",
-  "short_name": "RAMS",
-  "description": "Field-ready road asset management and inspection system.",
+  "name": "RoadAMS — Road Asset Management System",
+  "short_name": "RoadAMS",
+  "description": "Digital road infrastructure management platform.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
