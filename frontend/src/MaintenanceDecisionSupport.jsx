@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getMaintenanceDecisionSupport, getRoads } from "./api";
+import EmptyState from "./components/EmptyState";
 
 export default function MaintenanceDecisionSupport() {
   const [roads, setRoads] = useState([]);
@@ -40,6 +41,20 @@ export default function MaintenanceDecisionSupport() {
           ))}
         </select>
       </label>
+
+      {!roadId && (
+        <EmptyState
+          title="Select a road to open decision support"
+          icon="◎"
+          tone="info"
+        >
+          <p>
+            Choose a road above to see measured outcomes, cost efficiency, and
+            high-cost activities with weak recorded results. Metrics depend on
+            inspections and maintenance already stored in RoadMI.
+          </p>
+        </EmptyState>
+      )}
 
       {data && (
         <>
