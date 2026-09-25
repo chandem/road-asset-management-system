@@ -104,10 +104,39 @@ body {
   color: white;
   border-bottom: 1px solid rgba(255,255,255,.06);
 }
-.topbar-brand { min-width: 0; flex: 1; }
+.topbar-brand {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #0284c7, #6366f1);
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.3);
+  overflow: hidden;
+  user-select: none;
+}
+.topbar-brand-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 .topbar h1 {
-  margin: 0 0 6px;
-  font-size: clamp(1.45rem, 4.5vw, 1.85rem);
+  margin: 0;
+  font-size: clamp(1.35rem, 4vw, 1.75rem);
   font-weight: 800;
   letter-spacing: -.03em;
   line-height: 1.15;
@@ -115,8 +144,8 @@ body {
 .topbar p {
   margin: 0;
   opacity: .7;
-  font-size: .9rem;
-  line-height: 1.35;
+  font-size: .88rem;
+  line-height: 1.3;
 }
 .topbar-status {
   display: flex;
@@ -420,7 +449,7 @@ th, td { text-align: left; padding: 0.65rem 0.55rem; border-bottom: 1px solid va
   .auth-userbar { padding: .55rem .8rem; }
   .topbar { padding: 1rem .9rem 1.05rem; }
   .topbar-brand { gap: 10px; }
-  .topbar-brand::before { width: 40px; height: 40px; flex-basis: 40px; border-radius: 11px; }
+  .topbar-logo { width: 40px; height: 40px; border-radius: 11px; font-size: 0.82rem; }
   .topbar p { font-size: .78rem; }
   .topbar-status { gap: 5px; }
   .topbar-status .status { display: none; }
