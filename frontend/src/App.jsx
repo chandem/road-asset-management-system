@@ -344,7 +344,7 @@ export default function App({ authUser, user, onLogout }) {
       <header className="topbar">
         <div className="topbar-brand">
           <div>
-            <h1>RoadAMS</h1>
+            <h1>RoadMI</h1>
             <p>Road Asset Management System</p>
           </div>
         </div>
@@ -419,7 +419,7 @@ export default function App({ authUser, user, onLogout }) {
                 <p>
                   Add a road under <strong>Operations → Roads</strong>, draw geometry on the map,
                   then generate 500&nbsp;m sections. For demos, run the GitHub Action{" "}
-                  <strong>RoadAMS Seed Demo Data</strong>.
+                  <strong>RoadMI Seed Demo Data</strong>.
                 </p>
               </EmptyState>
             )}
