@@ -80,7 +80,7 @@ export default function Reports() {
 
   async function exportExcel() {
     try {
-      await downloadBlob(`/reports/export.xlsx${queryString()}`, "rams-reports.xlsx");
+      await downloadBlob(`/reports/export.xlsx${queryString()}`, "roadmi-reports.xlsx");
     } catch (err) { setError(err.message || "Excel export failed"); }
   }
 
