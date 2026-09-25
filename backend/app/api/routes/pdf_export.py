@@ -1,4 +1,4 @@
-"""PDF export for RAMS portfolio reports."""
+"""PDF export for RoadAMS portfolio reports."""
 
 from io import BytesIO
 from datetime import date
@@ -34,7 +34,7 @@ def build_reports_pdf(maint: dict, condition: dict, defects: dict, costs: dict) 
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=14 * mm, bottomMargin=14 * mm)
     styles = getSampleStyleSheet()
     story = [
-        Paragraph("Road Asset Management System", styles["Title"]),
+        Paragraph("RoadAMS — Road Asset Management System", styles["Title"]),
         Paragraph(f"Portfolio report — {date.today().isoformat()}", styles["Normal"]),
         Spacer(1, 8),
     ]
@@ -85,5 +85,5 @@ def build_reports_pdf(maint: dict, condition: dict, defects: dict, costs: dict) 
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": "attachment; filename=rams-reports.pdf"},
+        headers={"Content-Disposition": "attachment; filename=roadams-reports.pdf"},
     )
