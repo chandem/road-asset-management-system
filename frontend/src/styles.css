@@ -104,8 +104,7 @@ body {
   color: white;
   border-bottom: 1px solid rgba(255,255,255,.06);
 }
-.topbar-brand { min-width: 0; flex: 1; display: flex; align-items: center; gap: 14px; }
-.topbar-brand::before { content: "MI"; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; flex: 0 0 46px; border-radius: 13px; background: linear-gradient(135deg, #0ea5e9, #0284c7); color: #fff; font-weight: 900; letter-spacing: -0.06em; box-shadow: 0 8px 20px rgba(14,165,233,.25); }
+.topbar-brand { min-width: 0; flex: 1; }
 .topbar h1 {
   margin: 0 0 6px;
   font-size: clamp(1.45rem, 4.5vw, 1.85rem);
@@ -148,7 +147,7 @@ body {
   color: #fde68a;
 }
 
-/* Dark nav — clear selected state on touch */
+/* Dark nav */
 .app-nav {
   display: flex;
   flex-direction: column;
@@ -182,11 +181,6 @@ body {
   color: #e2e8f0;
   border-color: rgba(148,163,184,0.7);
   background: rgba(255,255,255,0.06);
-}
-.nav-group:active:not(.active),
-.nav-tab:active:not(.active) {
-  background: rgba(255,255,255,0.1);
-  color: #f8fafc;
 }
 .nav-group.active,
 .nav-group.active:hover,
@@ -328,26 +322,66 @@ th, td { text-align: left; padding: 0.65rem 0.55rem; border-bottom: 1px solid va
   gap: 0.85rem;
   text-align: center;
 }
-.auth-card > h1,
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.15rem;
+}
+.auth-brand-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.auth-brand-text h1 {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  line-height: 1.15;
+}
+.auth-product-name {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #64748b;
+  line-height: 1.3;
+}
 .auth-card > .auth-subtitle,
 .auth-card > label,
 .auth-card > .auth-error,
 .auth-card > .auth-button {
   text-align: left;
 }
-.auth-card > h1,
 .auth-card > .auth-subtitle {
   text-align: center;
+  margin: 0 0 0.25rem;
+  color: #64748b;
+  font-size: 0.92rem;
 }
 .auth-card > label {
   width: 100%;
 }
+/* Monogram badge — sized so letters fit fully */
 .auth-logo {
-  width: 48px; height: 48px; border-radius: 12px;
-  display: grid; place-items: center;
-  font-weight: 800; color: #fff;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: #fff;
   background: linear-gradient(135deg, #0284c7, #6366f1);
-  margin: 0 auto;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.28);
+  flex-shrink: 0;
+  overflow: hidden;
+  user-select: none;
 }
 .auth-button {
   border: none;
@@ -380,7 +414,6 @@ th, td { text-align: left; padding: 0.65rem 0.55rem; border-bottom: 1px solid va
   .map { height: 420px; }
   .card strong { font-size: 2rem; }
 }
-
 
 /* RoadMI responsive polish */
 @media (max-width: 720px) {
