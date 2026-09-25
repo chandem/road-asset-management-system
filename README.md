@@ -1,12 +1,12 @@
-# Road Asset Management System (RAMS)
+# RoadAMS — Road Asset Management System
 
-[![RAMS CI](https://github.com/chandem/road-asset-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/chandem/road-asset-management-system/actions/workflows/ci.yml)
+[![RoadAMS CI](https://github.com/chandem/road-asset-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/chandem/road-asset-management-system/actions/workflows/ci.yml)
 
 A road asset management platform for collecting, organizing, assessing, and managing road infrastructure data.
 
 ## Purpose
 
-RAMS is designed to support road agencies, maintenance teams, and engineers with a centralized system for road inventory, condition assessment, maintenance planning, GIS/GPS data, reporting, and future AI-assisted road defect detection.
+RoadAMS is designed to support road agencies, maintenance teams, and engineers with a centralized system for road inventory, condition assessment, maintenance planning, GIS/GPS data, reporting, and future AI-assisted road defect detection.
 
 ## Planned Features
 
@@ -180,7 +180,7 @@ The script is idempotent — safe to run more than once.
 
 ### AI model setup
 
-RAMS includes a YOLO inference adapter for road-defect images. The application reports AI readiness through `GET /api/v1/ai/status`. For real inference, provide trained weights at `AI_MODEL_PATH` and keep `AI_STUB_MODE=false`. Stub mode is intended only for demos/CI.
+RoadAMS includes a YOLO inference adapter for road-defect images. The application reports AI readiness through `GET /api/v1/ai/status`. For real inference, provide trained weights at `AI_MODEL_PATH` and keep `AI_STUB_MODE=false`. Stub mode is intended only for demos/CI.
 
 ### Environment variables
 
@@ -238,9 +238,9 @@ For a public or agency host (TLS, secrets, backups, AI model, hardening), see **
 
 ## Project Status
 
-🚧 **Active development — core RAMS workflows implemented; final hardening and production validation remain.**
+🚧 **Active development — core RoadAMS workflows implemented; final hardening and production validation remain.**
 
-RAMS is under development and the architecture will evolve as new road-management requirements are added.
+RoadAMS is under development and the architecture will evolve as new road-management requirements are added.
 
 ## Vision
 
