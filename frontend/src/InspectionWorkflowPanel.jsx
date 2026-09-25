@@ -6,6 +6,7 @@ import {
   getMaintenanceHistory,
   updateMaintenance,
 } from "./api";
+import EmptyState from "./components/EmptyState";
 
 function formatDate(value) {
   if (!value) return "—";
@@ -238,6 +239,16 @@ export default function InspectionWorkflowPanel() {
       {error && <div className="error-banner">{error}</div>}
       {maintenanceMessage && <div className="error-banner" style={{ marginBottom: 12 }}>{maintenanceMessage}</div>}
 
+      {!workflow && !loading && !error && (
+        <EmptyState title="Open an inspection to fill this workspace" icon="🔎" tone="info">
+          <p>
+            Enter an inspection ID above to load defects, maintenance links, photos,
+            and AI detections in one view. Without a selection the page stays empty by design —
+            open an inspection to populate the panels.
+          </p>
+        </EmptyState>
+      )}
+
       {workflow && (
         <>
           <div className="cards report-cards">
@@ -356,9 +367,15 @@ export default function InspectionWorkflowPanel() {
               {workflow.images.length === 0 ? <p>No photos linked.</p> : workflow.images.map((image) => (
                 <div key={image.image_id} style={{ padding: "8px 0", borderBottom: "1px solid #ddd" }}>
                   <strong>Image #{image.image_id}</strong>
-                  <div>{image.filename || "Unnamed image"}</div>
-                  <small>Captured: {formatDate(image.captured_at)} · Location: {image.latitude ?? "—"}, {image.longitude ?? "—"}</small>
+                  <div>{image.file_name || image.storage_key || "Stored image"}</div>
                 </div>
+              ))}
+            </div>
+
+            <div className="report-box">
+              <h3>AI detections</h3>
+              {(workflow.ai_detections || []).length === 0 ? <p>No AI detections yet.</p> : workflow.ai_detections.map((d, i) => (
+                <div key={i} style={{ padding: "6px 0" }}>{JSON.stringify(d)}</div>
               ))}
             </div>
           </div>
