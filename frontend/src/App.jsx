@@ -344,7 +344,7 @@ export default function App({ authUser, user, onLogout }) {
       <header className="topbar">
         <div className="topbar-brand">
           <h1>RoadAMS</h1>
-          <p>Road Asset Management System · Digital road infrastructure management dashboard</p>
+          <p>Road Asset Management System</p>
         </div>
         <div className="topbar-status">
           <span className={`connectivity ${navigator.onLine ? "online" : "offline"}`}>
