@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { API_BASE, getMaintenancePlans, getRoads } from "./api";
 import { getToken } from "./auth";
+import EmptyState from "./components/EmptyState";
 
 async function fetchReport(path) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -109,16 +110,14 @@ export default function Reports() {
           Plan year
           <select value={year} onChange={(e) => setYear(e.target.value)}>
             <option value="">All years</option>
-            {plans.map((plan) => (
-              <option key={plan.plan_id} value={plan.plan_year}>
-                {plan.plan_year} — {plan.name}
-              </option>
+            {[...new Set((plans || []).map((p) => p.plan_year).filter(Boolean))].sort().map((y) => (
+              <option key={y} value={y}>{y}</option>
             ))}
           </select>
         </label>
       </div>
-      <div className="button-row">
-        <button type="button" onClick={loadReports} disabled={loading}>
+      <div className="actions">
+        <button type="button" className="primary" onClick={loadReports} disabled={loading}>
           {loading ? "Loading…" : "Generate reports"}
         </button>
         <button type="button" onClick={exportMaintenanceCsv}>Export maintenance CSV</button>
@@ -126,6 +125,20 @@ export default function Reports() {
         <button type="button" onClick={exportPdf}>Export PDF</button>
       </div>
       {error && <div className="auth-error">{error}</div>}
+
+      {!loading && !maintenance && !condition && !defects && !costs && (
+        <EmptyState
+          title="Run a report to fill this page"
+          icon="▥"
+          tone="info"
+        >
+          <p>
+            Choose optional road / year filters, then click <strong>Generate reports</strong>.
+            Summary cards and tables appear here — until then this space shows guidance
+            instead of a blank screen.
+          </p>
+        </EmptyState>
+      )}
 
       {maintenance && (
         <div className="report-block">
