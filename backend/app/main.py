@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import Response
+from fastapi.responses import PlainTextResponse, Response
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -32,16 +32,20 @@ app = FastAPI(title=f"{settings.app_name} API", version="0.9.0", debug=settings.
 
 register_exception_handlers(app)
 
+# Build allow-list: explicit env origins + optional dynamic Vercel match via middleware below.
+_cors_origins = list(settings.cors_allowed_origins)
+
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=settings.trusted_hosts,
+    allowed_hosts=settings.trusted_hosts if settings.trusted_hosts != ["*"] else ["*"],
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_allowed_origins,
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Accept-Language", "Content-Language"],
 )
 
 

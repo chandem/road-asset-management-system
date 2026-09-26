@@ -1,9 +1,35 @@
 import os
+from urllib.parse import urlparse
 
 
 def _csv_env(name: str, default: str = "") -> list[str]:
     value = os.getenv(name, default)
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _origin_allowed(origin: str, allowed: list[str]) -> bool:
+    """Exact match, or https://*.vercel.app when CORS_ALLOW_VERCEL is enabled."""
+    if not origin:
+        return False
+    if origin in allowed:
+        return True
+    allow_vercel = os.getenv("CORS_ALLOW_VERCEL", "true").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if allow_vercel:
+        try:
+            parsed = urlparse(origin)
+            host = (parsed.hostname or "").lower()
+            if parsed.scheme == "https" and (
+                host == "vercel.app" or host.endswith(".vercel.app")
+            ):
+                return True
+        except Exception:
+            return False
+    return False
 
 
 class Settings:
@@ -33,6 +59,9 @@ class Settings:
         "yes",
         "on",
     }
+
+    def is_cors_origin_allowed(self, origin: str) -> bool:
+        return _origin_allowed(origin, self.cors_allowed_origins)
 
 
 settings = Settings()
