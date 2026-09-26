@@ -78,7 +78,8 @@ export default function PhotoAIPanel({
         <label>
           Latitude
           <input
-            type="number"\tableofcontents="0.000001"
+            type="number"
+            step="0.000001"
             value={photo.latitude}
             onChange={(e) => updatePhoto("latitude", e.target.value)}
           />
