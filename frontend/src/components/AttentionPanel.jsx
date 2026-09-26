@@ -76,12 +76,14 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
             <div className="attention-item">
               <strong className="attention-item-title">{wo.order_number}</strong>
               <span className="attention-item-meta">
-                Due {wo.due_date}
-                <span className="dot" aria-hidden="true">·</span>
-                {wo.status}
+                <span>Due: <strong>{wo.due_date || "—"}</strong></span>
+                <span className="meta-separator" aria-hidden="true">·</span>
+                <span>Status: <strong>{wo.status || "—"}</strong></span>
               </span>
               {wo.assigned_to ? (
-                <span className="attention-item-meta">{wo.assigned_to}</span>
+                <span className="attention-item-meta">
+                  <span>Assigned: <strong>{wo.assigned_to}</strong></span>
+                </span>
               ) : null}
             </div>
           )}
@@ -96,12 +98,12 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
               <strong className="attention-item-title">{d.defect_type}</strong>
               <span className="attention-item-meta">
                 <span className={`sev-badge sev-${String(d.severity || "").toLowerCase()}`}>
-                  {d.severity}
+                  {d.severity || "Unknown"}
                 </span>
                 {d.chainage_km != null && (
                   <>
-                    <span className="dot" aria-hidden="true">·</span>
-                    <span>km {d.chainage_km}</span>
+                    <span className="meta-separator" aria-hidden="true">·</span>
+                    <span>Chainage: <strong>km {d.chainage_km}</strong></span>
                   </>
                 )}
               </span>
@@ -117,13 +119,13 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
             <div className="attention-item">
               <strong className="attention-item-title">{m.activity_type}</strong>
               <span className="attention-item-meta">
-                Planned {m.planned_date}
-                <span className="dot" aria-hidden="true">·</span>
-                {m.status}
+                <span>Planned: <strong>{m.planned_date || "—"}</strong></span>
+                <span className="meta-separator" aria-hidden="true">·</span>
+                <span>Status: <strong>{m.status || "—"}</strong></span>
                 {m.priority ? (
                   <>
-                    <span className="dot" aria-hidden="true">·</span>
-                    <span className="priority-text">{m.priority}</span>
+                    <span className="meta-separator" aria-hidden="true">·</span>
+                    <span className="priority-text">Priority: <strong>{m.priority}</strong></span>
                   </>
                 ) : null}
               </span>
