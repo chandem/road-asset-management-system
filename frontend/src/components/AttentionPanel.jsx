@@ -1,5 +1,11 @@
 export default function AttentionPanel({ attention, loading, onNavigate }) {
-  const normalizedAttention = attention || { totals: {}, overdue_work_orders: [], high_severity_defects: [], overdue_maintenance: [], over_budget_plans: [] };
+  const normalizedAttention = attention || {
+    totals: {},
+    overdue_work_orders: [],
+    high_severity_defects: [],
+    overdue_maintenance: [],
+    over_budget_plans: [],
+  };
   const totals = normalizedAttention.totals || {};
 
   const safeNumber = (value) => Number(value) || 0;
@@ -54,7 +60,8 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
         <div className="attention-pills" aria-label="Operational alert totals">
           {severityCounts.map(({ key, label, tone }) => (
             <span key={key} className={`pill ${tone}`}>
-              {safeNumber(totals[key])} {label}
+              <strong>{safeNumber(totals[key])}</strong>
+              <span className="pill-label">{label}</span>
             </span>
           ))}
         </div>
@@ -66,11 +73,17 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
           empty="No overdue work orders"
           items={normalizedAttention.overdue_work_orders}
           render={(wo) => (
-            <>
-              <strong>{wo.order_number}</strong>
-              <span>Due {wo.due_date} · {wo.status}</span>
-              {wo.assigned_to && <span>{wo.assigned_to}</span>}
-            </>
+            <div className="attention-item">
+              <strong className="attention-item-title">{wo.order_number}</strong>
+              <span className="attention-item-meta">
+                Due {wo.due_date}
+                <span className="dot" aria-hidden="true">·</span>
+                {wo.status}
+              </span>
+              {wo.assigned_to ? (
+                <span className="attention-item-meta">{wo.assigned_to}</span>
+              ) : null}
+            </div>
           )}
           onOpen={() => onNavigate?.("workorders")}
         />
@@ -79,11 +92,20 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
           empty="No high-severity defects"
           items={normalizedAttention.high_severity_defects}
           render={(d) => (
-            <>
-              <strong>{d.defect_type}</strong>
-              <span className="sev">{d.severity}</span>
-              {d.chainage_km != null && <span>km {d.chainage_km}</span>}
-            </>
+            <div className="attention-item">
+              <strong className="attention-item-title">{d.defect_type}</strong>
+              <span className="attention-item-meta">
+                <span className={`sev-badge sev-${String(d.severity || "").toLowerCase()}`}>
+                  {d.severity}
+                </span>
+                {d.chainage_km != null && (
+                  <>
+                    <span className="dot" aria-hidden="true">·</span>
+                    <span>km {d.chainage_km}</span>
+                  </>
+                )}
+              </span>
+            </div>
           )}
           onOpen={() => onNavigate?.("reports")}
         />
@@ -92,11 +114,20 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
           empty="No overdue maintenance"
           items={normalizedAttention.overdue_maintenance}
           render={(m) => (
-            <>
-              <strong>{m.activity_type}</strong>
-              <span>Planned {m.planned_date} · {m.status}</span>
-              {m.priority && <span>{m.priority}</span>}
-            </>
+            <div className="attention-item">
+              <strong className="attention-item-title">{m.activity_type}</strong>
+              <span className="attention-item-meta">
+                Planned {m.planned_date}
+                <span className="dot" aria-hidden="true">·</span>
+                {m.status}
+                {m.priority ? (
+                  <>
+                    <span className="dot" aria-hidden="true">·</span>
+                    <span className="priority-text">{m.priority}</span>
+                  </>
+                ) : null}
+              </span>
+            </div>
           )}
           onOpen={() => onNavigate?.("maintenance")}
         />
@@ -105,15 +136,19 @@ export default function AttentionPanel({ attention, loading, onNavigate }) {
           empty="No over-budget plans"
           items={normalizedAttention.over_budget_plans}
           render={(p) => (
-            <>
-              <strong>
+            <div className="attention-item">
+              <strong className="attention-item-title">
                 {p.name} ({p.plan_year})
               </strong>
-              <span>
-                Spent {Number(p.spent).toLocaleString()} / budget {Number(p.budget).toLocaleString()}
+              <span className="attention-item-meta">
+                Spent {Number(p.spent).toLocaleString()} ETB
+                <span className="dot" aria-hidden="true">·</span>
+                Budget {Number(p.budget).toLocaleString()} ETB
               </span>
-              <span className="sev">+{Number(p.over_by).toLocaleString()}</span>
-            </>
+              <span className="attention-item-meta sev-text">
+                Over by {Number(p.over_by).toLocaleString()} ETB
+              </span>
+            </div>
           )}
           onOpen={() => onNavigate?.("planning")}
         />
@@ -137,7 +172,9 @@ function AttentionColumn({ title, empty, items, render, onOpen }) {
             aria-label={`Open ${title.toLowerCase()}`}
           >
             <span>View details</span>
-            <span className="attention-open-arrow" aria-hidden="true">→</span>
+            <span className="attention-open-arrow" aria-hidden="true">
+              →
+            </span>
           </button>
         )}
       </div>
@@ -145,9 +182,17 @@ function AttentionColumn({ title, empty, items, render, onOpen }) {
       {list.length === 0 ? (
         <p className="muted">{empty}</p>
       ) : (
-        <ul>
+        <ul className="attention-list">
           {list.slice(0, 8).map((item, index) => (
-            <li key={item.work_order_id || item.defect_id || item.maintenance_id || item.plan_id || index}>
+            <li
+              key={
+                item.work_order_id ||
+                item.defect_id ||
+                item.maintenance_id ||
+                item.plan_id ||
+                index
+              }
+            >
               {render(item)}
             </li>
           ))}
