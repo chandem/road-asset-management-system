@@ -395,8 +395,13 @@ textarea:focus-visible {
   color: #64748b;
   line-height: 1.35;
 }
-.attention-item-meta .dot {
+.attention-item-meta .dot,
+.attention-item-meta .meta-separator {
   color: #cbd5e1;
+  font-weight: 800;
+}
+.attention-item-meta strong {
+  color: #334155;
   font-weight: 800;
 }
 .sev-badge {
@@ -928,6 +933,35 @@ th, td { text-align: left; padding: 0.65rem 0.55rem; border-bottom: 1px solid va
   .attention-col:nth-child(odd) { border-right: none; }
 }
 @media (max-width: 720px) {
+  .attention-panel .panel-heading {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .attention-pills {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    justify-content: stretch;
+  }
+  .attention-pills .pill {
+    justify-content: center;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+  }
+  .attention-item-meta {
+    align-items: flex-start;
+  }
+  .attention-item-meta .meta-separator {
+    display: none;
+  }
+  .attention-item-meta > span {
+    max-width: 100%;
+    word-break: break-word;
+  }
+
   .auth-userbar { padding: .55rem .8rem; }
   .topbar { padding: 1rem .9rem 1.05rem; }
   .topbar-logo { width: 40px; height: 40px; font-size: 0.82rem; }
